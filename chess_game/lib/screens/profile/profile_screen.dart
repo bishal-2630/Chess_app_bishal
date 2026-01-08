@@ -1,14 +1,18 @@
-// lib/screens/profile/profile_screen.dart - NEW FILE
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
+import '../auth/auth_service.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final User? user = FirebaseAuth.instance.currentUser;
+    final authService = AuthService();
+    final User? user = authService.currentUser;
+    final bool isGuest = authService.isGuest;
+    final String displayName = isGuest ? (authService.guestName ?? "Guest Player") : (user?.displayName ?? 'Chess Player');
+    final String displayEmail = isGuest ? "Guest Account" : (user?.email ?? 'No email provided');
 
     return Scaffold(
       appBar: AppBar(
@@ -30,12 +34,12 @@ class ProfileScreen extends StatelessWidget {
               CircleAvatar(
                 radius: 60,
                 backgroundColor: Colors.blue[100],
-                backgroundImage: user?.photoURL != null
+                backgroundImage: (!isGuest && user?.photoURL != null)
                     ? NetworkImage(user!.photoURL!)
                     : null,
-                child: user?.photoURL == null
+                child: (isGuest || user?.photoURL == null)
                     ? Icon(
-                        Icons.person,
+                        isGuest ? Icons.person_outline : Icons.person,
                         size: 60,
                         color: Colors.blue[800],
                       )
@@ -46,12 +50,30 @@ class ProfileScreen extends StatelessWidget {
 
               // Display Name
               Text(
-                user?.displayName ?? 'Chess Player',
+                displayName,
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              if (isGuest)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  margin: const EdgeInsets.only(top: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[100],
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.orange),
+                  ),
+                  child: const Text(
+                    'Guest Session',
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
 
               const SizedBox(height: 10),
 
@@ -150,7 +172,7 @@ class ProfileScreen extends StatelessWidget {
                     ElevatedButton.icon(
                       onPressed: () async {
                         try {
-                          await FirebaseAuth.instance.signOut();
+                          await AuthService().signOut();
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(

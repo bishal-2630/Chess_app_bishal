@@ -5,6 +5,7 @@ import '../../services/signaling_service.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:math';
+import 'dart:async';
 
 class ChessScreen extends StatefulWidget {
   const ChessScreen({Key? key}) : super(key: key);
@@ -34,7 +35,10 @@ class _ChessGameScreenState extends State<ChessScreen> {
   bool _isConnectedToRoom = false;
   bool _isAudioOn = false;
   bool _isMuted = false;
+  bool _isIncomingCall = false;
   String _callStatus = "";
+  String? _playerColor; // 'w' or 'b' in multiplayer mode
+  Timer? _statusTimer;
 
   // New variables for check/checkmate detection
   bool whiteInCheck = false;
@@ -70,9 +74,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
 
     _signalingService.onAddRemoteStream = ((stream) {
       _remoteRenderer.srcObject = stream;
-      setState(() {
-        _callStatus = "Connected to opponent";
-      });
+      _setEphemeralStatus("Voice Connected");
     });
 
     _signalingService.onGameMove = (data) {
@@ -85,37 +87,125 @@ class _ChessGameScreenState extends State<ChessScreen> {
     
     _signalingService.onPlayerLeft = () {
        print("Opponent left");
+       ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Opponent left the room."),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 5),
+            )
+       );
        _hangUp(); // Disconnect self
     };
     
+    _signalingService.onConnectionState = (isConnected) {
+       setState(() {
+         _isConnectedToRoom = isConnected;
+       });
+       if (isConnected) {
+         _setEphemeralStatus("Connected to Server");
+       } else {
+         _setEphemeralStatus("Disconnected");
+       }
+       if (!isConnected) {
+         ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Warning: Disconnected from signaling server."))
+         );
+       }
+    };
+    
     _signalingService.onIncomingCall = () {
-      if (!_isAudioOn) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Incoming Audio Call... Press Phone icon to join."),
-            duration: Duration(seconds: 3),
-            backgroundColor: Colors.blue,
-            action: SnackBarAction(
-               label: 'Join',
-               textColor: Colors.white,
-               onPressed: () => _toggleAudio(),
-            ),
-          ),
-        );
-      }
+      setState(() {
+        _isIncomingCall = true;
+      });
+      _setEphemeralStatus("Incoming Call...");
+      _showIncomingCallDialog();
+    };
+
+    _signalingService.onCallAccepted = () {
+       setState(() {
+         _isAudioOn = true;
+       });
+       _setEphemeralStatus("Call Accepted");
+    };
+
+    _signalingService.onCallRejected = () {
+       setState(() {
+         _callStatus = "";
+       });
+       _setEphemeralStatus("Call Rejected by Opponent");
     };
 
     _signalingService.onEndCall = () async {
-       if (_isAudioOn) {
+       if (_isAudioOn || _callStatus == "Calling...") {
           await _signalingService.stopAudio();
           setState(() {
             _isAudioOn = false;
+            _isIncomingCall = false;
           });
+          _setEphemeralStatus("Call Ended");
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Call ended by opponent."))
+            SnackBar(content: Text("Call ended."), duration: Duration(seconds: 2))
           );
        }
     };
+
+    _signalingService.onNewGame = () {
+       _initializeBoard();
+       _setEphemeralStatus("Opponent started a new game");
+    };
+
+    _signalingService.onPlayerJoined = () {
+       _setEphemeralStatus("Opponent joined the room");
+    };
+  }
+
+  void _setEphemeralStatus(String message) {
+    _statusTimer?.cancel();
+    setState(() {
+      _callStatus = message;
+    });
+    _statusTimer = Timer(Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _callStatus = "";
+        });
+      }
+    });
+  }
+  
+  void _showIncomingCallDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text("Incoming Audio Call"),
+        content: Text("Opponent wants to start a voice chat."),
+        actions: [
+          TextButton(
+            onPressed: () {
+               Navigator.pop(context);
+               _signalingService.sendCallRejected();
+               // Reject / Ignore
+               setState(() {
+                 _isIncomingCall = false;
+               });
+               _setEphemeralStatus("Call Declined");
+            }, 
+            child: Text("Reject", style: TextStyle(color: Colors.red)),
+          ),
+          ElevatedButton.icon(
+            icon: Icon(Icons.call),
+            label: Text("Accept"),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            onPressed: () async {
+              Navigator.pop(context);
+              await _toggleAudio();
+            },
+          )
+        ],
+      )
+    );
   }
   
   void _showOpponentLeftDialog() {
@@ -150,6 +240,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
 
   @override
   void dispose() {
+    _statusTimer?.cancel();
     _localRenderer.dispose();
     _remoteRenderer.dispose();
     _signalingService.hangUp();
@@ -170,72 +261,105 @@ class _ChessGameScreenState extends State<ChessScreen> {
     }
   }
 
-  // Helper to determine the correct host based on platform
-  String get _host {
-    if (kIsWeb) return "127.0.0.1:8000";
-    if (defaultTargetPlatform == TargetPlatform.android) return "10.0.2.2:8000";
-    return "127.0.0.1:8000";
+  // default server url suggestion
+  String get _defaultServerUrl {
+    if (kIsWeb) return "ws://127.0.0.1:8000/ws/call/";
+    // Your public ngrok URL for testing from anywhere!
+    if (defaultTargetPlatform == TargetPlatform.android) return "wss://nonordered-nonfreezable-lionel.ngrok-free.dev/ws/call/";
+    return "ws://127.0.0.1:8000/ws/call/";
   }
 
-  void _connectRoom(String roomId) async {
+  void _connectRoom(String serverUrl, String roomId) async {
+    // Ensure URL ends with slash if needed, logic depends on backend but typically yes
+    String fullUrl = serverUrl;
+    if (!fullUrl.endsWith("/")) fullUrl += "/";
+    fullUrl += "$roomId/";
+    
     setState(() {
-      _callStatus = "Connecting to room...";
+      _callStatus = "Connecting...";
     });
     
-    final host = _host;
-    print("Connecting to $host for room $roomId");
+    print("Connecting to $fullUrl");
+    _signalingService.connect(fullUrl);
     
-    _signalingService.connect(host, roomId);
-
-    setState(() {
-      _isConnectedToRoom = true;
-      _callStatus = "Room: $roomId";
+    // Notify room that we joined
+    Future.delayed(Duration(milliseconds: 500), () {
+       _signalingService.sendJoin();
     });
+    
+    // Note: Success state is set via onConnectionState callback
   }
 
-  void _toggleAudio() async {
+  Future<void> _toggleAudio() async {
     if (_isAudioOn) {
+       // End Call
        _signalingService.sendEndCall();
        await _signalingService.stopAudio();
        setState(() {
          _isAudioOn = false;
+         _isIncomingCall = false;
        });
     } else {
-       await _signalingService.openUserMedia(_localRenderer, _remoteRenderer);
-       await _signalingService.call();
-       setState(() {
-         _isAudioOn = true;
-       });
+       // Start or Accept Call
+       if (_isIncomingCall) {
+          // Accept
+          await _signalingService.acceptCall(_localRenderer, _remoteRenderer);
+          setState(() {
+            _isAudioOn = true;
+            _isIncomingCall = false;
+          });
+          _setEphemeralStatus("Call Connected");
+       } else {
+          // Start Call (Initiator part)
+          await _signalingService.startCall(_localRenderer, _remoteRenderer);
+          setState(() {
+             // We don't set _isAudioOn yet! Wait for onCallAccepted
+          });
+          _setEphemeralStatus("Calling...");
+       }
     }
   }
 
   void _showRoomDialog() {
+    final TextEditingController _urlController = TextEditingController(text: _defaultServerUrl);
+
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: Text('Play Online'),
           content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ElevatedButton(
+             mainAxisSize: MainAxisSize.min,
+             children: [
+               TextField(
+                 controller: _urlController,
+                 decoration: InputDecoration(
+                   labelText: "Server Base URL",
+                   hintText: "ws://10.0.2.2:8000/ws/call/",
+                   border: OutlineInputBorder(),
+                 ),
+               ),
+               SizedBox(height: 16),
+               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  _createRoom();
+                  _playerColor = 'w';
+                  _createRoom(_urlController.text.trim());
                 },
-                child: Text('Create Room'),
+                child: Text('Create Room (Generate ID)'),
                 style: ElevatedButton.styleFrom(minimumSize: Size(double.infinity, 40)),
               ),
               SizedBox(height: 10),
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  _showJoinDialog();
+                  _playerColor = 'b';
+                  _showJoinDialog(_urlController.text.trim());
                 },
-                child: Text('Join Room'),
+                child: Text('Join Room (Enter ID)'),
                  style: ElevatedButton.styleFrom(minimumSize: Size(double.infinity, 40)),
               ),
-            ],
+             ],
           ),
           actions: [
             TextButton(
@@ -248,10 +372,10 @@ class _ChessGameScreenState extends State<ChessScreen> {
     );
   }
 
-  void _createRoom() {
+  void _createRoom(String serverUrl) {
     // Generate random 4-digit ID
     final String roomId = (1000 + Random().nextInt(9000)).toString();
-    _connectRoom(roomId);
+    _connectRoom(serverUrl, roomId);
     
     // Show ID to user
     showDialog(
@@ -261,8 +385,10 @@ class _ChessGameScreenState extends State<ChessScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Share this ID with your friend:'),
-            SizedBox(height: 10),
+            Text('Server: $serverUrl'),
+            SizedBox(height: 8),
+            Text('Room ID (Share this):'),
+            SizedBox(height: 4),
             Text(
               roomId,
               style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 2),
@@ -281,17 +407,25 @@ class _ChessGameScreenState extends State<ChessScreen> {
     );
   }
 
-  Future<void> _showJoinDialog() async {
+  Future<void> _showJoinDialog(String serverUrl) async {
     final TextEditingController _roomIdController = TextEditingController();
+    
     return showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: Text('Join Room'),
-          content: TextField(
-            controller: _roomIdController,
-            decoration: InputDecoration(hintText: "Enter Room ID (e.g. 1234)"),
-            keyboardType: TextInputType.number,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+               Text("Server: $serverUrl", style: TextStyle(fontSize: 12, color: Colors.grey)),
+               SizedBox(height: 10),
+               TextField(
+                controller: _roomIdController,
+                decoration: InputDecoration(hintText: "Enter Room ID (e.g. 1234)"),
+                keyboardType: TextInputType.number,
+              ),
+            ],
           ),
           actions: [
             TextButton(
@@ -303,7 +437,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
                 final roomId = _roomIdController.text.trim();
                 if (roomId.isNotEmpty) {
                   Navigator.pop(context);
-                  _connectRoom(roomId);
+                  _connectRoom(serverUrl, roomId);
                 }
               },
               child: Text('Join'),
@@ -316,17 +450,21 @@ class _ChessGameScreenState extends State<ChessScreen> {
 
   // Deprecated direct join (keeping helper but unused in main UI flow if prefered)
   Future<void> _showJoinCallDialog() async {
-    _showJoinDialog();
+    // _showJoinDialog(_defaulturl);
   }
 
   void _hangUp() async {
     await _signalingService.hangUp();
-    await _signalingService.disconnect();
     setState(() {
       _isConnectedToRoom = false;
       _isAudioOn = false;
-      _callStatus = "";
+      _isIncomingCall = false;
+      _callStatus = "Room Disconnected";
+      _playerColor = null; // Back to local mode
     });
+    
+    // Reset board for a fresh local start if desired, or keep as is.
+    // _initializeBoard(); 
   }
 
   void _executeMove(int fromRow, int fromCol, int toRow, int toCol, String piece) {
@@ -821,6 +959,18 @@ class _ChessGameScreenState extends State<ChessScreen> {
       // Selecting a piece
       if (piece.isNotEmpty) {
         final isPieceWhite = _isWhitePiece(piece);
+        
+        // Multiplayer movement restriction
+        if (_isConnectedToRoom && _playerColor != null) {
+           final isMyPiece = (isPieceWhite && _playerColor == 'w') || (!isPieceWhite && _playerColor == 'b');
+           if (!isMyPiece) {
+             ScaffoldMessenger.of(context).showSnackBar(
+               SnackBar(content: Text("That is your opponent's piece!"), duration: Duration(milliseconds: 500))
+             );
+             return;
+           }
+        }
+
         if ((isPieceWhite && isWhiteTurn) || (!isPieceWhite && !isWhiteTurn)) {
           _calculateValidMoves(row, col, piece);
           setState(() {
@@ -1112,17 +1262,21 @@ class _ChessGameScreenState extends State<ChessScreen> {
               ),
             ),
           ),
-          // Call Status Footer
-          if (_isConnectedToRoom || _callStatus.isNotEmpty)
+          // Call Status Footer (Only show when message is active)
+          if (_callStatus.isNotEmpty)
             Container(
               padding: EdgeInsets.all(8),
+              width: double.infinity,
               color: Colors.green[100],
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.mic, size: 16),
+                  Icon(Icons.info_outline, size: 16, color: Colors.green[800]),
                   SizedBox(width: 8),
-                  Text("Voice: $_callStatus"),
+                  Text(
+                    _callStatus,
+                    style: TextStyle(color: Colors.green[800], fontWeight: FontWeight.w500),
+                  ),
                 ],
               ),
             ),
@@ -1134,17 +1288,22 @@ class _ChessGameScreenState extends State<ChessScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 ElevatedButton.icon(
-                  onPressed: _undoMove,
+                  onPressed: _isConnectedToRoom ? null : _undoMove,
                   icon: const Icon(Icons.undo),
                   label: const Text('Undo Move'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
+                    backgroundColor: _isConnectedToRoom ? Colors.grey : Colors.orange,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 20, vertical: 12),
                   ),
                 ),
                 ElevatedButton.icon(
-                  onPressed: _initializeBoard,
+                  onPressed: () {
+                    if (_isConnectedToRoom) {
+                       _signalingService.sendNewGame();
+                    }
+                    _initializeBoard();
+                  },
                   icon: const Icon(Icons.refresh),
                   label: const Text('New Game'),
                   style: ElevatedButton.styleFrom(

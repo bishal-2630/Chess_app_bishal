@@ -130,6 +130,47 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _signInAsGuest() async {
+    final TextEditingController _nameController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Enter Guest Username'),
+        content: TextField(
+          controller: _nameController,
+          decoration: const InputDecoration(
+            labelText: 'Username',
+            hintText: 'e.g. ChessPro',
+            border: OutlineInputBorder(),
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final name = _nameController.text.trim();
+              if (name.isNotEmpty) {
+                Navigator.pop(context);
+                await _authService.loginAsGuest(name);
+                if (context.mounted) {
+                  _showSuccessSnackBar('Welcome, $name!');
+                  context.go('/chess');
+                }
+              }
+            },
+            child: const Text('Start Playing'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showSuccessSnackBar(String message) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -301,6 +342,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   label: const Text(
                     'Sign in with Google',
                     style: TextStyle(color: Colors.blue),
+                  ),
+                ),
+                
+                const SizedBox(height: 15),
+
+                // Guest Play Button
+                TextButton.icon(
+                  onPressed: _isLoading ? null : _signInAsGuest,
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  icon: const Icon(Icons.person_outline),
+                  label: const Text(
+                    'Play as Guest',
+                    style: TextStyle(fontSize: 16),
                   ),
                 ),
 

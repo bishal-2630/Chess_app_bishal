@@ -6,18 +6,27 @@ typedef void StreamStateCallback(MediaStream stream);
 
 class SignalingService {
   WebSocketChannel? _channel;
-  String? _roomId;
   RTCPeerConnection? _peerConnection;
   MediaStream? _localStream;
   List<RTCIceCandidate> _remoteCandidates = [];
   
+  // Call handling
+  Map<String, dynamic>? _pendingOffer;
+
   StreamStateCallback? onLocalStream;
   StreamStateCallback? onAddRemoteStream;
   StreamStateCallback? onRemoveRemoteStream;
   Function(Map<String, dynamic>)? onGameMove;
   void Function()? onPlayerLeft;
+  void Function()? onPlayerJoined;
   void Function()? onEndCall;
+  void Function()? onCallRejected;
   void Function()? onIncomingCall;
+  void Function()? onCallAccepted;
+  void Function()? onNewGame;
+  
+  // Connection state callbacks
+  void Function(bool isConnected)? onConnectionState;
 
   // Stun servers
   Map<String, dynamic> configuration = {
@@ -31,29 +40,43 @@ class SignalingService {
     ]
   };
 
-  void connect(String host, String roomId) {
-    _roomId = roomId;
-    // Assuming 'ws' for local dev, wss for production. Adjust port/host as needed.
-    // e.g. ws://10.0.2.2:8000/ws/call/ROOMID/ if using Android Emulator
-    _channel = WebSocketChannel.connect(Uri.parse('ws://$host/ws/call/$roomId/'));
-
-    _channel!.stream.listen((message) {
-      print('Received message: $message');
-      _onMessage(jsonDecode(message));
-    });
+  // Connect using a full URL (e.g., ws://... or wss://...)
+  void connect(String socketUrl) {
+    print('Connecting to signaling server: $socketUrl');
+    try {
+      _channel = WebSocketChannel.connect(Uri.parse(socketUrl));
+      
+      _channel!.stream.listen((message) {
+        print('Received message: $message');
+        _onMessage(jsonDecode(message));
+      }, onDone: () {
+        print('WebSocket Closed');
+        if (onConnectionState != null) onConnectionState!(false);
+      }, onError: (error) {
+         print('WebSocket Error: $error');
+         if (onConnectionState != null) onConnectionState!(false);
+      });
+      
+      // Notify UI that we are attempting/connected
+      if (onConnectionState != null) onConnectionState!(true);
+      
+    } catch (e) {
+      print('Connection failed: $e');
+      if (onConnectionState != null) onConnectionState!(false);
+    }
   }
 
   Future<void> _onMessage(Map<String, dynamic> data) async {
     String type = data['type'];
-    // handle structure variations: sometimes payload is nested, sometimes flat
     Map<String, dynamic> payload = data['payload'] ?? data; 
 
     switch (type) {
       case 'offer':
+        // received an offer, notify UI but DO NOT answer yet
+        _pendingOffer = payload;
         if (onIncomingCall != null) {
           onIncomingCall!();
         }
-        await _handleOffer(payload);
         break;
       case 'answer':
         await _handleAnswer(payload);
@@ -76,9 +99,81 @@ class SignalingService {
           onEndCall!();
         }
         break;
+      case 'call_accepted':
+        if (onCallAccepted != null) {
+          onCallAccepted!();
+        }
+        break;
+      case 'new_game':
+        if (onNewGame != null) {
+          onNewGame!();
+        }
+        break;
+      case 'join':
+        if (onPlayerJoined != null) {
+          onPlayerJoined!();
+        }
+        break;
+      case 'call_rejected':
+        if (onCallRejected != null) {
+           onCallRejected!();
+        }
+        break;
       default:
         print('Unknown message type: $type');
     }
+  }
+
+  // --- Call Control ---
+
+  // Initiator: Start a call
+  Future<void> startCall(RTCVideoRenderer localVideo, RTCVideoRenderer remoteVideo) async {
+     await _openUserMedia(localVideo, remoteVideo);
+     await _createPeerConnection();
+     
+     RTCSessionDescription offer = await _peerConnection!.createOffer();
+     await _peerConnection!.setLocalDescription(offer);
+     
+     _send('offer', {
+       'sdp': offer.sdp,
+       'type': offer.type,
+     });
+  }
+
+  // Receiver: Accept an incoming call
+  Future<void> acceptCall(RTCVideoRenderer localVideo, RTCVideoRenderer remoteVideo) async {
+    if (_pendingOffer == null) {
+       print("No pending offer to accept");
+       return;
+    }
+    
+    await _openUserMedia(localVideo, remoteVideo);
+    await _createPeerConnection(); // Create PC before setting remote desc
+
+    // Set Remote Description (the pending offer)
+    var description = RTCSessionDescription(_pendingOffer!['sdp'], _pendingOffer!['type']);
+    await _peerConnection!.setRemoteDescription(description);
+    
+    // Create Answer
+    RTCSessionDescription answer = await _peerConnection!.createAnswer();
+    await _peerConnection!.setLocalDescription(answer);
+    
+    _send('answer', {
+       'sdp': answer.sdp,
+       'type': answer.type,
+    });
+    
+    // Clear pending
+    _pendingOffer = null;
+    
+    // Notify initiator that we accepted
+    _send('call_accepted', {});
+
+    // Add any queued candidates
+    for (var candidate in _remoteCandidates) {
+       await _peerConnection!.addCandidate(candidate);
+    }
+    _remoteCandidates.clear();
   }
 
   void sendEndCall() {
@@ -110,7 +205,7 @@ class SignalingService {
     }
   }
 
-  Future<void> openUserMedia(RTCVideoRenderer localVideo, RTCVideoRenderer remoteVideo) async {
+  Future<void> _openUserMedia(RTCVideoRenderer localVideo, RTCVideoRenderer remoteVideo) async {
      final Map<String, dynamic> mediaConstraints = {
       'audio': true,
       'video': false, // Audio only call
@@ -127,33 +222,6 @@ class SignalingService {
     }
   }
 
-  Future<void> call() async {
-    await _createPeerConnection();
-    
-    RTCSessionDescription offer = await _peerConnection!.createOffer();
-    await _peerConnection!.setLocalDescription(offer);
-    
-    _send('offer', {
-      'sdp': offer.sdp,
-      'type': offer.type,
-    });
-  }
-
-  Future<void> _handleOffer(Map<String, dynamic> data) async {
-     await _createPeerConnection();
-
-     var description = RTCSessionDescription(data['sdp'], data['type']);
-     await _peerConnection!.setRemoteDescription(description);
-
-     RTCSessionDescription answer = await _peerConnection!.createAnswer();
-     await _peerConnection!.setLocalDescription(answer);
-
-     _send('answer', {
-       'sdp': answer.sdp,
-       'type': answer.type,
-     });
-  }
-
   Future<void> _handleAnswer(Map<String, dynamic> data) async {
      var description = RTCSessionDescription(data['sdp'], data['type']);
      await _peerConnection!.setRemoteDescription(description);
@@ -168,6 +236,9 @@ class SignalingService {
     
     if (_peerConnection != null) {
        await _peerConnection!.addCandidate(candidate);
+    } else {
+       // Queue candidate if PC not ready (e.g. slight race in accepting)
+       _remoteCandidates.add(candidate);
     }
   }
 
@@ -188,6 +259,18 @@ class SignalingService {
     _send('bye', {});
   }
   
+  void sendNewGame() {
+    _send('new_game', {});
+  }
+
+  void sendJoin() {
+    _send('join', {});
+  }
+  
+  void sendCallRejected() {
+    _send('call_rejected', {});
+  }
+  
   void muteAudio(bool mute) {
     if (_localStream != null && _localStream!.getAudioTracks().isNotEmpty) {
       _localStream!.getAudioTracks()[0].enabled = !mute;
@@ -198,6 +281,7 @@ class SignalingService {
   Future<void> stopAudio() async {
       try {
         if (_localStream != null) {
+          _localStream!.getTracks().forEach((track) => track.stop());
           _localStream!.dispose();
           _localStream = null;
         }

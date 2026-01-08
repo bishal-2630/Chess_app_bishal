@@ -8,6 +8,7 @@ import 'screens/auth/register_screen.dart';
 import 'screens/auth/forgot_password.dart';
 import 'screens/game/chess_screen.dart';
 import 'screens/profile/profile_screen.dart';
+import 'screens/auth/auth_service.dart';
 import 'screens/call_screen.dart'; // NEW
 
 void main() async {
@@ -55,19 +56,20 @@ class MyApp extends StatelessWidget {
         ),
       ],
       redirect: (context, state) {
-        final user = FirebaseAuth.instance.currentUser;
+        final authService = AuthService();
+        final isLoggedIn = authService.isLoggedIn;
         final currentPath = state.uri.path;
         final isAuthPage = currentPath == '/login' ||
             currentPath == '/register' ||
             currentPath == '/forgot-password';
 
         // Force authentication check
-        if (user == null && !isAuthPage) {
+        if (!isLoggedIn && !isAuthPage) {
           return '/login';
         }
 
         // If logged in and trying to access auth pages, go to chess
-        if (user != null && isAuthPage) {
+        if (isLoggedIn && isAuthPage) {
           return '/chess';
         }
 

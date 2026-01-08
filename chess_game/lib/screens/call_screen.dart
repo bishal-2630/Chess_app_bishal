@@ -4,7 +4,7 @@ import '../services/signaling_service.dart';
 
 class CallScreen extends StatefulWidget {
   final String roomId;
-  final String host; // For testing, pass host (e.g. 10.0.2.2:8000)
+  final String host; 
 
   const CallScreen({Key? key, required this.roomId, required this.host}) : super(key: key);
 
@@ -38,14 +38,23 @@ class _CallScreenState extends State<CallScreen> {
       _remoteRenderer.srcObject = stream;
       setState(() {});
     });
+    
+    _signalingService.onIncomingCall = () {
+       // Auto-accept in this simple call screen example if needed,
+       // or show a dialog. For now, let's just let the user press the button.
+    };
   }
 
   void _connect() async {
-    // Ideally user ID or game ID is the room ID
-    _signalingService.connect(widget.host, widget.roomId);
+    // Ensure URL matches the scheme
+    String url = widget.host;
+    if (!url.startsWith("ws")) {
+      url = "ws://$url/ws/call/";
+    }
+    if (!url.endsWith("/")) url += "/";
+    url += widget.roomId + "/";
     
-    // Auto-open user media on enter (optional, or wait for call button)
-    // await _signalingService.openUserMedia(_localRenderer, _remoteRenderer);
+    _signalingService.connect(url);
   }
 
   @override
@@ -79,8 +88,7 @@ class _CallScreenState extends State<CallScreen> {
               if (!_inCall)
               ElevatedButton(
                 onPressed: () async {
-                  await _signalingService.openUserMedia(_localRenderer, _remoteRenderer);
-                  await _signalingService.call();
+                  await _signalingService.startCall(_localRenderer, _remoteRenderer);
                   setState(() {
                     _inCall = true;
                   });
@@ -91,7 +99,7 @@ class _CallScreenState extends State<CallScreen> {
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                 onPressed: () async {
-                  await _signalingService.hangUp();
+                  await _signalingService.stopAudio();
                   setState(() {
                     _inCall = false;
                   });

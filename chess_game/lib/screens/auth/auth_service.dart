@@ -7,8 +7,20 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 class AuthService {
+  // Singleton pattern
+  static final AuthService _instance = AuthService._internal();
+  factory AuthService() => _instance;
+  AuthService._internal();
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
+
+  // Guest State
+  bool _isGuest = false;
+  String? _guestName;
+
+  bool get isGuest => _isGuest;
+  String? get guestName => _guestName;
 
   String get _baseUrl {
     if (kIsWeb) return 'http://127.0.0.1:8000/api/auth/';
@@ -16,8 +28,23 @@ class AuthService {
     return 'http://127.0.0.1:8000/api/auth/';
   }
 
+  // --- Auth Methods ---
+
+  Future<void> loginAsGuest(String name) async {
+    _isGuest = true;
+    _guestName = name;
+    print('👤 Logged in as Guest: $name');
+  }
+
+  void logoutGuest() {
+    _isGuest = false;
+    _guestName = null;
+    print('👤 Guest logged out');
+  }
+
   // Sign In with Email/Password
   Future<User?> signInWithEmailPassword(String email, String password) async {
+    logoutGuest(); // Clear guest state if logging in
     print('🔐 Attempting sign in with email: $email');
 
     try {
@@ -86,6 +113,7 @@ class AuthService {
 
   // Sign In with Google
   Future<User?> signInWithGoogle() async {
+    logoutGuest(); // Clear guest state
     print('🔄 Starting Google sign in');
 
     try {
@@ -286,7 +314,7 @@ class AuthService {
   }
 
   // Check if user is logged in
-  bool get isLoggedIn => _auth.currentUser != null;
+  bool get isLoggedIn => _auth.currentUser != null || _isGuest;
 
   // Get current user
   User? get currentUser => _auth.currentUser;
@@ -295,8 +323,12 @@ class AuthService {
   Future<void> signOut() async {
     try {
       print('🔄 Signing out');
-      await _auth.signOut();
-      await _googleSignIn.signOut();
+      if (_isGuest) {
+        logoutGuest();
+      } else {
+        await _auth.signOut();
+        await _googleSignIn.signOut();
+      }
       print('✅ Signed out successfully');
     } catch (e) {
       print('❌ Sign out error: $e');
