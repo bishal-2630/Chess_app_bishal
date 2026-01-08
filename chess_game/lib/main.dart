@@ -51,7 +51,7 @@ class MyApp extends StatelessWidget {
           path: '/call',
           builder: (context, state) => const CallScreen(
             roomId: 'testroom', 
-            host: '10.0.2.2:8000'
+            host: ''
           ), 
         ),
       ],

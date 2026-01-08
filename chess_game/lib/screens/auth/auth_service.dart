@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../../services/config.dart';
 
 class AuthService {
   // Singleton pattern
@@ -23,9 +24,7 @@ class AuthService {
   String? get guestName => _guestName;
 
   String get _baseUrl {
-    if (kIsWeb) return 'http://127.0.0.1:8000/api/auth/';
-    if (defaultTargetPlatform == TargetPlatform.android) return 'http://10.0.2.2:8000/api/auth/';
-    return 'http://127.0.0.1:8000/api/auth/';
+    return AppConfig.baseUrl;
   }
 
   // --- Auth Methods ---

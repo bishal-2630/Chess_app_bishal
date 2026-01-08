@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../services/signaling_service.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:flutter/foundation.dart';
+import '../../services/config.dart';
 import 'dart:math';
 import 'dart:async';
 
@@ -263,10 +264,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
 
   // default server url suggestion
   String get _defaultServerUrl {
-    if (kIsWeb) return "ws://127.0.0.1:8000/ws/call/";
-    // Your public ngrok URL for testing from anywhere!
-    if (defaultTargetPlatform == TargetPlatform.android) return "wss://nonordered-nonfreezable-lionel.ngrok-free.dev/ws/call/";
-    return "ws://127.0.0.1:8000/ws/call/";
+    return AppConfig.socketUrl;
   }
 
   void _connectRoom(String serverUrl, String roomId) async {
@@ -321,8 +319,6 @@ class _ChessGameScreenState extends State<ChessScreen> {
   }
 
   void _showRoomDialog() {
-    final TextEditingController _urlController = TextEditingController(text: _defaultServerUrl);
-
     showDialog(
       context: context,
       builder: (context) {
@@ -331,20 +327,13 @@ class _ChessGameScreenState extends State<ChessScreen> {
           content: Column(
              mainAxisSize: MainAxisSize.min,
              children: [
-               TextField(
-                 controller: _urlController,
-                 decoration: InputDecoration(
-                   labelText: "Server Base URL",
-                   hintText: "ws://10.0.2.2:8000/ws/call/",
-                   border: OutlineInputBorder(),
-                 ),
-               ),
-               SizedBox(height: 16),
+               const Text("Connect to the multiplayer server to play with others."),
+               SizedBox(height: 20),
                ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
                   _playerColor = 'w';
-                  _createRoom(_urlController.text.trim());
+                  _createRoom(_defaultServerUrl);
                 },
                 child: Text('Create Room (Generate ID)'),
                 style: ElevatedButton.styleFrom(minimumSize: Size(double.infinity, 40)),
@@ -354,7 +343,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
                 onPressed: () {
                   Navigator.pop(context);
                   _playerColor = 'b';
-                  _showJoinDialog(_urlController.text.trim());
+                  _showJoinDialog(_defaultServerUrl);
                 },
                 child: Text('Join Room (Enter ID)'),
                  style: ElevatedButton.styleFrom(minimumSize: Size(double.infinity, 40)),
