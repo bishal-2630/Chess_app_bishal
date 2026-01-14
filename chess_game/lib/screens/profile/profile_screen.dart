@@ -22,9 +22,12 @@ class ProfileScreen extends StatelessWidget {
           onPressed: () => context.go('/chess'),
         ),
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -210,6 +213,8 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
             ],
+            ),
+            ),
           ),
         ),
       ),

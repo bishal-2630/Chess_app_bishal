@@ -191,9 +191,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
           onPressed: _isLoading ? null : () => context.go('/login'),
         ),
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
           child: Form(
             key: _formKey,
             child: Column(
@@ -392,6 +395,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ],
                 ),
               ],
+            ),
+            ),
             ),
           ),
         ),
