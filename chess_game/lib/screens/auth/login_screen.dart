@@ -50,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
         } else if (e.toString().contains('user-disabled')) {
           errorMessage = 'This account has been disabled';
         }
-        _showErrorSnackBar('$errorMessage: ${e.toString()}');
+        _showErrorSnackBar('$errorMessage: $e');
       } finally {
         if (context.mounted) {
           setState(() {

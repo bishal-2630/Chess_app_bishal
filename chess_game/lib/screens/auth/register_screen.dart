@@ -58,7 +58,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         } else if (e.toString().contains('network-request-failed')) {
           errorMessage = 'Network error. Check your internet connection';
         }
-        _showErrorSnackBar('$errorMessage');
+        _showErrorSnackBar('$errorMessage: $e');
       } finally {
         if (context.mounted) {
           setState(() {

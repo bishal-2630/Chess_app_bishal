@@ -192,19 +192,23 @@ class AuthService {
 
       if (response.statusCode == 200) {
         print('✅ Session synced with backend');
+        print('📦 Response Body: ${response.body}');
         
         // Extract cookies from response headers
         String? rawCookie = response.headers['set-cookie'];
         if (rawCookie != null) {
+           print('🍪 Found cookies to inject');
            await _injectCookies(rawCookie);
+        } else {
+           print('⚠️ No set-cookie header found in response');
         }
       } else {
-        print('⚠️ Failed to sync session: ${response.statusCode}');
+        print('❌ Failed to sync session: ${response.statusCode}');
+        print('📦 Error Body: ${response.body}');
         try {
           final errorData = json.decode(response.body);
-          if (errorData['traceback'] != null) {
-            print('🔍 Backend Traceback:');
-            print(errorData['traceback']);
+          if (errorData['detail'] != null) {
+            print('🔍 Backend Message: ${errorData['detail']}');
           }
         } catch (e) {
           print('Could not parse error body: $e');
