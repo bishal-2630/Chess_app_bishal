@@ -16,7 +16,9 @@ class AuthService {
   AuthService._internal();
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: '764791811000-kn05hpnb455ddt2l3ib414lgorv8pj14.apps.googleusercontent.com',
+  );
   final CookieManager _cookieManager = CookieManager.instance();
 
   // Guest State
