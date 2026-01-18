@@ -33,4 +33,4 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
   assets:
-    # - assets/google_logo.png
+    - assets/google_logo.png
