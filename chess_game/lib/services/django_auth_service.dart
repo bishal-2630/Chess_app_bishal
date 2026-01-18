@@ -57,6 +57,7 @@ class DjangoAuthService {
     try {
       // Use emergency bypass endpoint temporarily
       final url = '${_baseUrl}bypass/';
+      print('🌐 DEBUG: Calling URL: $url');  // Add debug print
       final response = await http.post(
         Uri.parse(url),
         headers: {
