@@ -92,7 +92,9 @@ class DjangoAuthService {
         final errorData = json.decode(response.body);
         String errorMessage = 'Login failed';
         
-        if (errorData['detail'] != null) {
+        if (errorData['message'] != null) {
+          errorMessage = errorData['message'];
+        } else if (errorData['detail'] != null) {
           errorMessage = errorData['detail'];
         } else if (errorData['email'] != null) {
           errorMessage = errorData['email'][0];
