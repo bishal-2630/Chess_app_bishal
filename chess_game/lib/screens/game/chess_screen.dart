@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/signaling_service.dart';
+import '../../services/django_auth_service.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:flutter/foundation.dart';
 import '../../services/config.dart';
@@ -16,7 +16,7 @@ class ChessScreen extends StatefulWidget {
 }
 
 class _ChessGameScreenState extends State<ChessScreen> {
-  final User? user = FirebaseAuth.instance.currentUser;
+  final DjangoAuthService _authService = DjangoAuthService();
 
   // Chess board state
   List<List<String>> board = [];
@@ -1753,10 +1753,10 @@ class _ChessGameScreenState extends State<ChessScreen> {
                   CircleAvatar(
                     radius: 24,
                     backgroundColor: Colors.blue[100],
-                    backgroundImage: user?.photoURL != null
-                        ? NetworkImage(user!.photoURL!)
+                    backgroundImage: _authService.currentUser?['profile_picture'] != null
+                        ? NetworkImage(_authService.currentUser!['profile_picture']!)
                         : null,
-                    child: user?.photoURL == null
+                    child: _authService.currentUser?['profile_picture'] == null
                         ? Icon(
                             Icons.person,
                             size: 24,
@@ -1770,14 +1770,14 @@ class _ChessGameScreenState extends State<ChessScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          user?.displayName ?? 'Chess Player',
+                          _authService.displayName,
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
-                          user?.email ?? 'No email',
+                          _authService.email ?? 'No email',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[600],

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'auth_service.dart';
+import '../../services/django_auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -14,7 +14,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _usernameController = TextEditingController();
-  final AuthService _authService = AuthService();
+  final DjangoAuthService _authService = DjangoAuthService();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -28,39 +28,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
 
       try {
-        final user = await _authService.registerWithEmailPassword(
+        final result = await _authService.registerWithEmailPassword(
           _emailController.text.trim(),
           _passwordController.text,
           _usernameController.text.trim(),
         );
 
-        if (user != null) {
+        if (result['success'] == true) {
           _showSuccessSnackBar('Registration successful!');
-
-          // Verify email if needed
-          if (!user.emailVerified) {
-            _showSuccessSnackBar('Please verify your email');
-          }
-
+          
           // Navigate to home screen directly
           if (context.mounted) {
             context.go('/chess');
           }
+        } else {
+          _showErrorSnackBar(result['error'] ?? 'Registration failed. Please try again.');
         }
       } catch (e) {
-        String errorMessage = 'Registration failed';
-        if (e.toString().contains('email-already-in-use')) {
-          errorMessage = 'Email already in use. Please login instead.';
-        } else if (e.toString().contains('weak-password')) {
-          errorMessage = 'Password is too weak. Use at least 6 characters.';
-        } else if (e.toString().contains('invalid-email')) {
-          errorMessage = 'Invalid email format';
-        } else if (e.toString().contains('network-request-failed')) {
-          errorMessage = 'Network error. Check your internet connection';
-        }
-        _showErrorSnackBar('$errorMessage: $e');
+        _showErrorSnackBar('Registration failed. Please try again.');
       } finally {
-        if (context.mounted) {
+        if (mounted) {
           setState(() {
             _isLoading = false;
           });
@@ -75,38 +62,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      final user = await _authService.signInWithGoogle();
+      final result = await _authService.signInWithGoogle();
 
-      if (user != null) {
+      if (result['success'] == true) {
         _showSuccessSnackBar('Google registration successful!');
-
-        // Check if user is new
-        final isNewUser = user.metadata.creationTime != null &&
-            user.metadata.lastSignInTime != null &&
-            user.metadata.creationTime!
-                    .difference(user.metadata.lastSignInTime!)
-                    .abs() <
-                Duration(seconds: 1);
-
-        if (isNewUser) {
-          _showSuccessSnackBar('Welcome to Chess Game! Account created.');
-        }
-
         if (context.mounted) {
           context.go('/chess');
         }
       } else {
-        _showErrorSnackBar('Registration cancelled');
+        _showErrorSnackBar(result['error'] ?? 'Registration cancelled');
       }
     } catch (e) {
-      String errorMessage = 'Google registration failed';
-      if (e.toString().contains('sign_in_failed')) {
-        errorMessage =
-            'Google sign-in failed. Make sure Google Play Services are updated.';
-      } else if (e.toString().contains('network_error')) {
-        errorMessage = 'Network error. Check your internet connection';
-      }
-      _showErrorSnackBar('$errorMessage: ${e.toString()}');
+      print('Google registration error: $e');
+      _showErrorSnackBar('Google registration failed: ${e.toString()}');
     } finally {
       if (context.mounted) {
         setState(() {

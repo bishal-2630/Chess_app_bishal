@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'auth_service.dart';
+import '../../services/django_auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,7 +12,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final AuthService _authService = AuthService();
+  final DjangoAuthService _authService = DjangoAuthService();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -25,34 +25,24 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       try {
-        final user = await _authService.signInWithEmailPassword(
+        final result = await _authService.signInWithEmailPassword(
           _emailController.text.trim(),
           _passwordController.text,
         );
 
-        if (user != null) {
+        if (result['success'] == true) {
           _showSuccessSnackBar('Login successful!');
           // Navigate to home screen
           if (context.mounted) {
             context.go('/chess');
           }
         } else {
-          _showErrorSnackBar('Login failed. Please try again.');
+          _showErrorSnackBar(result['error'] ?? 'Login failed. Please try again.');
         }
       } catch (e) {
-        String errorMessage = 'Login failed';
-        if (e.toString().contains('user-not-found')) {
-          errorMessage = 'No account found with this email';
-        } else if (e.toString().contains('wrong-password')) {
-          errorMessage = 'Incorrect password';
-        } else if (e.toString().contains('too-many-requests')) {
-          errorMessage = 'Too many attempts. Try again later';
-        } else if (e.toString().contains('user-disabled')) {
-          errorMessage = 'This account has been disabled';
-        }
-        _showErrorSnackBar('$errorMessage: $e');
+        _showErrorSnackBar('Login failed. Please try again.');
       } finally {
-        if (context.mounted) {
+        if (mounted) {
           setState(() {
             _isLoading = false;
           });
@@ -93,35 +83,19 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final user = await _authService.signInWithGoogle();
+      final result = await _authService.signInWithGoogle();
 
-      if (user != null) {
+      if (result['success'] == true) {
         _showSuccessSnackBar('Google sign-in successful!');
         if (context.mounted) {
           context.go('/chess');
         }
       } else {
-        _showErrorSnackBar('Sign in cancelled');
+        _showErrorSnackBar(result['error'] ?? 'Sign in cancelled');
       }
     } catch (e) {
       print('Google sign-in error: $e');
-
-      // Show actual error message instead of navigating
-      String errorMessage = 'Google sign-in failed';
-
-      if (e.toString().contains('sign_in_failed')) {
-        errorMessage =
-            'Google Sign-In configuration error. Please check Firebase setup.';
-      } else if (e.toString().contains('network_error')) {
-        errorMessage = 'Network error. Check your internet connection';
-      } else if (e.toString().contains('invalid-credential')) {
-        errorMessage = 'Invalid Google credentials. Please try again.';
-      }
-
-      _showErrorSnackBar('$errorMessage: ${e.toString()}');
-
-      // DO NOT NAVIGATE ON ERROR!
-      // Only navigate on successful sign-in
+      _showErrorSnackBar('Google sign-in failed: ${e.toString()}');
     } finally {
       if (context.mounted) {
         setState(() {
@@ -157,15 +131,14 @@ class _LoginScreenState extends State<LoginScreen> {
             onPressed: () async {
               final name = _nameController.text.trim();
               if (name.isNotEmpty) {
-                Navigator.pop(context);
                 await _authService.loginAsGuest(name);
+                Navigator.pop(context);
                 if (context.mounted) {
-                  _showSuccessSnackBar('Welcome, $name!');
                   context.go('/chess');
                 }
               }
             },
-            child: const Text('Start Playing'),
+            child: const Text('Play as Guest'),
           ),
         ],
       ),

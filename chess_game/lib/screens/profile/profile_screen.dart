@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
-import '../auth/auth_service.dart';
+import '../../services/django_auth_service.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final authService = AuthService();
-    final User? user = authService.currentUser;
+    final authService = DjangoAuthService();
+    final Map<String, dynamic>? user = authService.currentUser;
     final bool isGuest = authService.isGuest;
-    final String displayName = isGuest ? (authService.guestName ?? "Guest Player") : (user?.displayName ?? 'Chess Player');
-    final String displayEmail = isGuest ? "Guest Account" : (user?.email ?? 'No email provided');
+    final String displayName = authService.displayName;
+    final String displayEmail = isGuest ? "Guest Account" : (user?['email'] ?? 'No email provided');
 
     return Scaffold(
       appBar: AppBar(
@@ -37,10 +36,10 @@ class ProfileScreen extends StatelessWidget {
               CircleAvatar(
                 radius: 60,
                 backgroundColor: Colors.blue[100],
-                backgroundImage: (!isGuest && user?.photoURL != null)
-                    ? NetworkImage(user!.photoURL!)
+                backgroundImage: (!isGuest && user?['profile_picture'] != null)
+                    ? NetworkImage(user!['profile_picture']!)
                     : null,
-                child: (isGuest || user?.photoURL == null)
+                child: (isGuest || user?['profile_picture'] == null)
                     ? Icon(
                         isGuest ? Icons.person_outline : Icons.person,
                         size: 60,
@@ -82,7 +81,7 @@ class ProfileScreen extends StatelessWidget {
 
               // Email
               Text(
-                user?.email ?? 'No email provided',
+                displayEmail,
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.grey[600],
@@ -100,32 +99,23 @@ class ProfileScreen extends StatelessWidget {
                     children: [
                       ListTile(
                         leading: const Icon(Icons.email),
-                        title: const Text('Email Verified'),
-                        trailing: Icon(
-                          user?.emailVerified == true
-                              ? Icons.verified
-                              : Icons.warning,
-                          color: user?.emailVerified == true
-                              ? Colors.green
-                              : Colors.orange,
+                        title: const Text('Account Type'),
+                        subtitle: Text(
+                          isGuest ? 'Guest Account' : 'Registered User',
                         ),
                       ),
                       ListTile(
                         leading: const Icon(Icons.calendar_today),
-                        title: const Text('Account Created'),
+                        title: const Text('Username'),
                         subtitle: Text(
-                          user?.metadata.creationTime != null
-                              ? '${user!.metadata.creationTime!.toLocal()}'
-                              : 'Unknown',
+                          user?['username'] ?? 'Unknown',
                         ),
                       ),
                       ListTile(
                         leading: const Icon(Icons.login),
-                        title: const Text('Last Sign In'),
+                        title: const Text('Authentication'),
                         subtitle: Text(
-                          user?.metadata.lastSignInTime != null
-                              ? '${user!.metadata.lastSignInTime!.toLocal()}'
-                              : 'Unknown',
+                          user?['google_id'] != null ? 'Google Sign-In' : 'Email/Password',
                         ),
                       ),
                     ],
@@ -175,7 +165,7 @@ class ProfileScreen extends StatelessWidget {
                     ElevatedButton.icon(
                       onPressed: () async {
                         try {
-                          await AuthService().signOut();
+                          await authService.signOut();
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
