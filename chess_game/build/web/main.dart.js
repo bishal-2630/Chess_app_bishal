@@ -48210,8 +48210,8 @@ n.e=null
 A.aT("\ud83d\udc64 Guest logged out")
 A.aT("\ud83d\udd10 Attempting Django sign in with email: "+a)
 p=4
-m=A.hy()+"final-bypass/"
-A.aT("\ud83c\udf10 DEBUG: Calling URL: "+A.f(m))
+m=A.hy()+"login/"
+A.aT("\ud83c\udf10 Calling URL: "+A.f(m))
 f=A.cj(m,0,null)
 e=t.N
 d=A.T(["Content-Type","application/json","Accept","application/json"],e,e)

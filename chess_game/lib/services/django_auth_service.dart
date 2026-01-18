@@ -55,9 +55,9 @@ class DjangoAuthService {
     print('🔐 Attempting Django sign in with email: $email');
 
     try {
-      // Use the final, function-based bypass endpoint
-      final url = '${_baseUrl}final-bypass/';
-      print('🌐 DEBUG: Calling URL: $url');  // Add debug print
+      // Use standard Django login endpoint
+      final url = '${_baseUrl}login/';
+      print('🌐 Calling URL: $url');
       final response = await http.post(
         Uri.parse(url),
         headers: {
