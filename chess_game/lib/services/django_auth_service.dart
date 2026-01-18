@@ -55,8 +55,7 @@ class DjangoAuthService {
     print('🔐 Attempting Django sign in with email: $email');
 
     try {
-      // Use debug endpoint temporarily
-      final url = '${_baseUrl}debug-login/';
+      final url = '${_baseUrl}login/';
       final response = await http.post(
         Uri.parse(url),
         headers: {
