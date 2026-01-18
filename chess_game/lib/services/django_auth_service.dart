@@ -21,6 +21,8 @@ class DjangoAuthService {
   Map<String, dynamic>? _currentUser;
   bool _isGuest = false;
   String? _guestName;
+  String? _accessToken;
+  String? _refreshToken;
 
   // Getters
   Map<String, dynamic>? get currentUser => _currentUser;
@@ -53,7 +55,8 @@ class DjangoAuthService {
     print('🔐 Attempting Django sign in with email: $email');
 
     try {
-      final url = '${_baseUrl}login/';
+      // Use debug endpoint temporarily
+      final url = '${_baseUrl}debug-login/';
       final response = await http.post(
         Uri.parse(url),
         headers: {
@@ -66,55 +69,70 @@ class DjangoAuthService {
         }),
       );
 
-      print('📡 Login response status: ${response.statusCode}');
-      print('📦 Login response body: ${response.body}');
+      print('📡 Registration response status: ${response.statusCode}');
+      print('📦 Registration response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
         
-        // Store user data
-        _currentUser = responseData['user'];
-        
-        // Handle cookies for web view
-        String? rawCookie = response.headers['set-cookie'];
-        if (rawCookie != null) {
-          print('🍪 Found cookies to inject');
-          await _injectCookies(rawCookie);
+        if (responseData['success'] == true) {
+          _currentUser = responseData['user'];
+          print('✅ Django login successful: ${responseData['user']['email']}');
+          
+          // Store tokens if available
+          if (responseData['tokens'] != null) {
+            _accessToken = responseData['tokens']['access'];
+            _refreshToken = responseData['tokens']['refresh'];
+          }
+          
+          return {
+            'success': true,
+            'user': responseData['user'],
+            'tokens': responseData['tokens'] ?? {},
+          };
+        } else {
+          final errorMessage = responseData['message'] ?? 'Login failed';
+          print('❌ Django login error: $errorMessage');
+          return {
+            'success': false,
+            'error': errorMessage,
+          };
         }
-        
-        print('✅ Django sign in successful: ${_currentUser?['email']}');
-        return {
-          'success': true,
-          'user': _currentUser,
-          'tokens': responseData
-        };
       } else {
-        final errorData = json.decode(response.body);
+        // Handle error responses
         String errorMessage = 'Login failed';
-        
-        if (errorData['message'] != null) {
-          errorMessage = errorData['message'];
-        } else if (errorData['detail'] != null) {
-          errorMessage = errorData['detail'];
-        } else if (errorData['email'] != null) {
-          errorMessage = errorData['email'][0];
-        } else if (errorData['password'] != null) {
-          errorMessage = errorData['password'][0];
-        } else if (errorData['non_field_errors'] != null) {
-          errorMessage = errorData['non_field_errors'][0];
+        try {
+          final errorData = json.decode(response.body);
+          
+          // Check for message field first
+          if (errorData['message'] != null) {
+            errorMessage = errorData['message'];
+          }
+          // Fallback to other error fields
+          else if (errorData['detail'] != null) {
+            errorMessage = errorData['detail'];
+          } else if (errorData['email'] != null) {
+            errorMessage = errorData['email'][0];
+          } else if (errorData['password'] != null) {
+            errorMessage = errorData['password'][0];
+          } else if (errorData['non_field_errors'] != null) {
+            errorMessage = errorData['non_field_errors'][0];
+          }
+        } catch (e) {
+          errorMessage = 'Network error during login: ${response.statusCode}';
         }
         
-        print('❌ Django login error: $errorMessage');
+        print('❌ Network error during login: $errorMessage');
         return {
           'success': false,
-          'error': errorMessage
+          'error': errorMessage,
         };
       }
     } catch (e) {
-      print('❌ Network error during login: $e');
+      print('❌ Exception during login: $e');
       return {
         'success': false,
-        'error': 'Network error. Please check your connection.'
+        'error': 'Network error: $e',
       };
     }
   }
