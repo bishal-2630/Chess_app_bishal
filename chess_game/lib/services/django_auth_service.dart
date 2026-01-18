@@ -53,7 +53,7 @@ class DjangoAuthService {
     print('🔐 Attempting Django sign in with email: $email');
 
     try {
-      final url = '${_baseUrl}api/auth/login/';
+      final url = '${_baseUrl}login/';
       final response = await http.post(
         Uri.parse(url),
         headers: {
@@ -125,7 +125,7 @@ class DjangoAuthService {
     print('📝 Starting Django registration for: $email');
 
     try {
-      final url = '${_baseUrl}api/auth/register/';
+      final url = '${_baseUrl}register/';
       final response = await http.post(
         Uri.parse(url),
         headers: {
@@ -208,7 +208,7 @@ class DjangoAuthService {
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
 
       // Send Google token to Django backend
-      final url = '${_baseUrl}api/auth/google-login/';
+      final url = '${_baseUrl}google-login/';
       final response = await http.post(
         Uri.parse(url),
         headers: {
@@ -404,7 +404,7 @@ class DjangoAuthService {
         logoutGuest();
       } else {
         // Call Django logout endpoint
-        final url = '${_baseUrl}api/auth/logout/';
+        final url = '${_baseUrl}logout/';
         try {
           await http.post(
             Uri.parse(url),
