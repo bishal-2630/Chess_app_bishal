@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/signaling_service.dart';
 import '../../services/django_auth_service.dart';
+import '../../services/notification_service.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:flutter/foundation.dart';
 import '../../services/config.dart';
@@ -17,6 +18,7 @@ class ChessScreen extends StatefulWidget {
 
 class _ChessGameScreenState extends State<ChessScreen> {
   final DjangoAuthService _authService = DjangoAuthService();
+  final NotificationService _notificationService = NotificationService();
 
   // Chess board state
   List<List<String>> board = [];
@@ -80,6 +82,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
     super.initState();
     _initializeBoard();
     _initRenderers();
+    _notificationService.connect();
   }
 
   Future<void> _initRenderers() async {
@@ -254,6 +257,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
     _localRenderer.dispose();
     _remoteRenderer.dispose();
     _signalingService.hangUp();
+    _notificationService.disconnect();
     super.dispose();
   }
 
@@ -1895,48 +1899,79 @@ class _ChessGameScreenState extends State<ChessScreen> {
           // Controls
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            child: Column(
               children: [
-                ElevatedButton.icon(
-                  onPressed: _isConnectedToRoom || pendingPromotion != null
-                      ? null
-                      : _undoMove,
-                  icon: const Icon(Icons.undo),
-                  label: const Text('Undo Move'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        (_isConnectedToRoom || pendingPromotion != null)
-                            ? Colors.grey
-                            : Colors.orange,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _isConnectedToRoom || pendingPromotion != null
+                          ? null
+                          : _undoMove,
+                      icon: const Icon(Icons.undo),
+                      label: const Text('Undo Move'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            (_isConnectedToRoom || pendingPromotion != null)
+                                ? Colors.grey
+                                : Colors.orange,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        if (_isConnectedToRoom) {
+                          _signalingService.sendNewGame();
+                        }
+                        _initializeBoard();
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('New Game'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: _showRoomDialog,
+                      icon: const Icon(Icons.videogame_asset),
+                      label: const Text('Play Online'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                      ),
+                    ),
+                  ],
                 ),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    if (_isConnectedToRoom) {
-                      _signalingService.sendNewGame();
-                    }
-                    _initializeBoard();
-                  },
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('New Game'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
-                  ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: _showRoomDialog,
-                  icon: const Icon(Icons.videogame_asset),
-                  label: const Text('Play Online'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
-                  ),
+                const SizedBox(height: 12),
+                // User Management Buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () => context.go('/users'),
+                      icon: const Icon(Icons.people),
+                      label: const Text('Players'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.purple,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => context.go('/invitations'),
+                      icon: const Icon(Icons.mail),
+                      label: const Text('Invites'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

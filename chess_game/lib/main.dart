@@ -6,7 +6,10 @@ import 'screens/auth/forgot_password.dart';
 import 'screens/game/chess_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/call_screen.dart';
+import 'screens/users/user_list_screen.dart';
+import 'screens/users/invitations_screen.dart';
 import 'services/django_auth_service.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,8 +46,19 @@ class MyApp extends StatelessWidget {
         ),
         GoRoute(
           path: '/call',
-          builder: (context, state) =>
-              const CallScreen(roomId: 'testroom', host: ''),
+          builder: (context, state) {
+            final roomId = state.uri.queryParameters['roomId'] ?? 'testroom';
+            final host = state.uri.queryParameters['host'] ?? '';
+            return CallScreen(roomId: roomId, host: host);
+          },
+        ),
+        GoRoute(
+          path: '/users',
+          builder: (context, state) => const UserListScreen(),
+        ),
+        GoRoute(
+          path: '/invitations',
+          builder: (context, state) => const InvitationsScreen(),
         ),
       ],
       redirect: (context, state) {
