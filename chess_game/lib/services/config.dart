@@ -11,13 +11,13 @@ class AppConfig {
   }
 
   static String get baseUrl {
-    if (kIsWeb) return 'http://127.0.0.1:8000/api/auth/';
+    if (kIsWeb) return 'https://$_host/api/auth/';
     // Production Railway URL
     return 'https://$_host/api/auth/';
   }
 
   static String get socketUrl {
-    if (kIsWeb) return "ws://127.0.0.1:8000/ws/call/";
+    if (kIsWeb) return "wss://$_host/ws/call/";
     // Production Railway URL
     return "wss://$_host/ws/call/";
   }
