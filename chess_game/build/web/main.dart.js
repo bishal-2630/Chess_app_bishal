@@ -29430,8 +29430,8 @@ return s},
 aLY(a,b,c){var s=null
 return c.a(A.aYM(a,b,s,s,s,s))},
 aLX(a,b,c){return c.a(A.b5x(a,[b]))},
-hy(){return"https://chessgameapp.up.railway.app/api/auth/"},
-aFR(){return"wss://chessgameapp.up.railway.app/ws/call/"},
+hy(){return"https://chess-game-app-production.up.railway.app/api/auth/"},
+aFR(){return"wss://chess-game-app-production.up.railway.app/ws/call/"},
 aal(){var s=0,r=A.q(t.P),q,p=2,o=[],n,m,l,k,j,i,h,g
 var $async$aal=A.r(function(a,b){if(a===1){o.push(b)
 s=p}for(;;)switch(s){case 0:p=4
