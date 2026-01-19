@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 class AppConfig {
   // Update this with your Railway WebSocket backend URL
-  static const String _railwayHost = 'chessgameapp.up.railway.app';
+  static const String _railwayHost = 'chess-game-app-production.up.railway.app';
   
   // For development, you can override with environment variable
   static String get _host {
