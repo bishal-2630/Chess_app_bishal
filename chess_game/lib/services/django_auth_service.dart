@@ -14,7 +14,7 @@ class DjangoAuthService {
 
   final CookieManager _cookieManager = CookieManager.instance();
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    serverClientId: '764791811000-kn05hpnb455ddt2l3ib414lgorv8pj14.apps.googleusercontent.com',
+    serverClientId: '764791811000-uhnrqvpfe4euoaff3kmiekrc7p7c4obk.apps.googleusercontent.com',
   );
   
   // User data storage
