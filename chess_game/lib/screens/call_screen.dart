@@ -4,9 +4,9 @@ import '../services/signaling_service.dart';
 
 class CallScreen extends StatefulWidget {
   final String roomId;
-  final String host; 
+  final String callerName; 
 
-  const CallScreen({Key? key, required this.roomId, required this.host}) : super(key: key);
+  const CallScreen({Key? key, required this.roomId, required this.callerName}) : super(key: key);
 
   @override
   _CallScreenState createState() => _CallScreenState();
@@ -46,15 +46,15 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   void _connect() async {
-    // Ensure URL matches the scheme
-    String url = widget.host;
-    if (!url.startsWith("ws")) {
-      url = "ws://$url/ws/call/";
-    }
-    if (!url.endsWith("/")) url += "/";
-    url += widget.roomId + "/";
+    // ALWAYS use the global socket URL for the connection host
+    String baseUrl = AppConfig.socketUrl;
+    if (!baseUrl.endsWith("/")) baseUrl += "/";
     
-    _signalingService.connect(url);
+    // Append the roomId to form the full call room URL
+    String fullUrl = baseUrl + widget.roomId + "/";
+    
+    print("📞 Connecting to call room: $fullUrl");
+    _signalingService.connect(fullUrl);
   }
 
   @override

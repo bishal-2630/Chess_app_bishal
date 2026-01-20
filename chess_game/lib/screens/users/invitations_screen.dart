@@ -62,7 +62,7 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
             final senderName = invitation['sender']['username'];
             
             // Navigate to the game room
-            context.go('/call?roomId=$roomId&host=$senderName');
+            context.go('/call?roomId=$roomId&callerName=$senderName');
           } else {
             // Refresh invitations after declining
             _loadInvitations();

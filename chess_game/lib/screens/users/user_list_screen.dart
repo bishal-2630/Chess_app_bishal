@@ -85,7 +85,7 @@ class _UserListScreenState extends State<UserListScreen> {
           ),
         );
         // Navigate to the game room
-        context.go('/call?roomId=$roomId&host=${_authService.displayName}');
+        context.go('/call?roomId=$roomId&callerName=${_authService.currentUser?['username'] ?? 'User'}');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

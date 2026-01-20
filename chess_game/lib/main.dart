@@ -48,8 +48,8 @@ class MyApp extends StatelessWidget {
           path: '/call',
           builder: (context, state) {
             final roomId = state.uri.queryParameters['roomId'] ?? 'testroom';
-            final host = state.uri.queryParameters['host'] ?? '';
-            return CallScreen(roomId: roomId, host: host);
+            final callerName = state.uri.queryParameters['callerName'] ?? '';
+            return CallScreen(roomId: roomId, callerName: callerName);
           },
         ),
         GoRoute(
