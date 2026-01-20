@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import './websocket_helper.dart';
@@ -38,7 +39,8 @@ class SignalingService {
           'stun:stun2.l.google.com:19302'
         ]
       }
-    ]
+    ],
+    'sdpSemantics': 'unified-plan',
   };
 
   // Connect using a full URL (e.g., ws://... or wss://...)
@@ -202,7 +204,12 @@ class SignalingService {
   Future<void> _createPeerConnection() async {
     _peerConnection = await createPeerConnection(configuration);
 
-    _peerConnection!.onIceCandidate = (RTCIceCandidate candidate) {
+    _peerConnection!.onIceCandidate = (RTCIceCandidate? candidate) {
+        if (candidate == null) {
+          print("✅ ICE Gathering Complete (Null Candidate Signal)");
+          return;
+        }
+        print("📞 ICE Candidate generated: ${candidate.candidate?.substring(0, min(20, candidate.candidate?.length ?? 0))}...");
         _send('candidate', {
           'candidate': candidate.candidate,
           'sdpMid': candidate.sdpMid,
@@ -210,7 +217,20 @@ class SignalingService {
         });
     };
 
+    _peerConnection!.onIceConnectionState = (RTCIceConnectionState state) {
+      print("🧊 ICE Connection State: $state");
+    };
+
+    _peerConnection!.onIceGatheringState = (RTCIceGatheringState state) {
+      print("📶 ICE Gathering State: $state");
+    };
+
+    _peerConnection!.onSignalingState = (RTCSignalingState state) {
+      print("📡 Signaling State: $state");
+    };
+
     _peerConnection!.onTrack = (RTCTrackEvent event) {
+        print("🎵 Remote track received: ${event.track.kind}");
         if (event.streams.isNotEmpty && onAddRemoteStream != null) {
           onAddRemoteStream!(event.streams[0]);
         }
@@ -269,6 +289,11 @@ class SignalingService {
 
   Future<void> _handleCandidate(Map<String, dynamic> data) async {
     try {
+      if (data['candidate'] == null) {
+        print("ℹ️ Peer signaled end of ICE candidates");
+        return;
+      }
+      
       var candidate = RTCIceCandidate(
         data['candidate'], 
         data['sdpMid'], 
@@ -276,7 +301,7 @@ class SignalingService {
       );
       
       if (_peerConnection != null) {
-         print("📞 Adding ICE candidate");
+         print("📞 Adding ICE candidate from remote");
          await _peerConnection!.addCandidate(candidate);
       } else {
          print("⏳ Queueing ICE candidate (PC not ready)");
