@@ -384,9 +384,11 @@ class _ChessGameScreenState extends State<ChessScreen> {
   void _createRoom(String serverUrl) {
     // Generate random 4-digit ID
     final String roomId = (1000 + Random().nextInt(9000)).toString();
-    _connectRoom(serverUrl, roomId);
+    
+    // Use the unified route-based connection
+    context.go('/chess?roomId=$roomId&color=w');
 
-    // Show ID to user
+    // Show ID to user - we use roomID from above
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -394,8 +396,6 @@ class _ChessGameScreenState extends State<ChessScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Server: $serverUrl'),
-            SizedBox(height: 8),
             Text('Room ID (Share this):'),
             SizedBox(height: 4),
             Text(
@@ -404,7 +404,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
                   fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 2),
             ),
             SizedBox(height: 20),
-            Text('Waiting for opponent...'),
+            Text('Opponent can join using this ID.'),
           ],
         ),
         actions: [
@@ -428,9 +428,6 @@ class _ChessGameScreenState extends State<ChessScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text("Server: $serverUrl",
-                  style: TextStyle(fontSize: 12, color: Colors.grey)),
-              SizedBox(height: 10),
               TextField(
                 controller: _roomIdController,
                 decoration:
@@ -449,7 +446,8 @@ class _ChessGameScreenState extends State<ChessScreen> {
                 final roomId = _roomIdController.text.trim();
                 if (roomId.isNotEmpty) {
                   Navigator.pop(context);
-                  _connectRoom(serverUrl, roomId);
+                  // Use the unified route-based connection
+                  context.go('/chess?roomId=$roomId&color=b');
                 }
               },
               child: Text('Join'),
