@@ -10,7 +10,9 @@ import 'dart:math';
 import 'dart:async';
 
 class ChessScreen extends StatefulWidget {
-  const ChessScreen({Key? key}) : super(key: key);
+  final String? roomId;
+  final String? color;
+  const ChessScreen({Key? key, this.roomId, this.color}) : super(key: key);
 
   @override
   State<ChessScreen> createState() => _ChessGameScreenState();
@@ -83,6 +85,14 @@ class _ChessGameScreenState extends State<ChessScreen> {
     _initializeBoard();
     _initRenderers();
     _notificationService.connect();
+
+    // Auto-connect if parameters provided via route
+    if (widget.roomId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _playerColor = widget.color ?? 'w';
+        _connectRoom(_defaultServerUrl, widget.roomId!);
+      });
+    }
   }
 
   Future<void> _initRenderers() async {
@@ -291,11 +301,6 @@ class _ChessGameScreenState extends State<ChessScreen> {
 
     print("Connecting to $fullUrl");
     _signalingService.connect(fullUrl);
-
-    // Notify room that we joined
-    Future.delayed(Duration(milliseconds: 500), () {
-      _signalingService.sendJoin();
-    });
 
     // Note: Success state is set via onConnectionState callback
   }

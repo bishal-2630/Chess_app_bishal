@@ -38,7 +38,11 @@ class MyApp extends StatelessWidget {
         ),
         GoRoute(
           path: '/chess',
-          builder: (context, state) => const ChessScreen(),
+          builder: (context, state) {
+            final roomId = state.uri.queryParameters['roomId'];
+            final color = state.uri.queryParameters['color'];
+            return ChessScreen(roomId: roomId, color: color);
+          },
         ),
         GoRoute(
           path: '/profile',
