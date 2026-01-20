@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import '../../services/config.dart';
 import 'dart:math';
 import 'dart:async';
+import 'package:permission_handler/permission_handler.dart';
 
 class ChessScreen extends StatefulWidget {
   final String? roomId;
@@ -317,6 +318,18 @@ class _ChessGameScreenState extends State<ChessScreen> {
   }
 
   Future<void> _toggleAudio() async {
+    // Request microphone permission before starting/accepting call
+    if (!kIsWeb) {
+      var status = await Permission.microphone.request();
+      if (status != PermissionStatus.granted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("Microphone permission is required for audio calls."),
+          backgroundColor: Colors.red,
+        ));
+        return;
+      }
+    }
+
     if (_isAudioOn) {
       // End Call
       _signalingService.sendEndCall();
@@ -327,21 +340,26 @@ class _ChessGameScreenState extends State<ChessScreen> {
       });
     } else {
       // Start or Accept Call
-      if (_isIncomingCall) {
-        // Accept
-        await _signalingService.acceptCall(_localRenderer, _remoteRenderer);
-        setState(() {
-          _isAudioOn = true;
-          _isIncomingCall = false;
-        });
-        _setEphemeralStatus("Call Connected");
-      } else {
-        // Start Call (Initiator part)
-        await _signalingService.startCall(_localRenderer, _remoteRenderer);
-        setState(() {
-          // We don't set _isAudioOn yet! Wait for onCallAccepted
-        });
-        _setEphemeralStatus("Calling...");
+      try {
+        if (_isIncomingCall) {
+          // Accept
+          await _signalingService.acceptCall(_localRenderer, _remoteRenderer);
+          setState(() {
+            _isAudioOn = true;
+            _isIncomingCall = false;
+          });
+          _setEphemeralStatus("Call Connected");
+        } else {
+          // Start Call (Initiator part)
+          await _signalingService.startCall(_localRenderer, _remoteRenderer);
+          _setEphemeralStatus("Calling...");
+        }
+      } catch (e) {
+        print("❌ Error starting audio call: $e");
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text("Could not start audio call: $e"),
+          backgroundColor: Colors.red,
+        ));
       }
     }
   }

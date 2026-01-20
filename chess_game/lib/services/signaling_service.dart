@@ -135,16 +135,24 @@ class SignalingService {
 
   // Initiator: Start a call
   Future<void> startCall(RTCVideoRenderer localVideo, RTCVideoRenderer remoteVideo) async {
-     await _openUserMedia(localVideo, remoteVideo);
-     await _createPeerConnection();
-     
-     RTCSessionDescription offer = await _peerConnection!.createOffer();
-     await _peerConnection!.setLocalDescription(offer);
-     
-     _send('offer', {
-       'sdp': offer.sdp,
-       'type': offer.type,
-     });
+     try {
+       await _openUserMedia(localVideo, remoteVideo);
+       if (_localStream == null) throw Exception("Failed to get local media stream");
+       
+       await _createPeerConnection();
+       if (_peerConnection == null) throw Exception("Failed to create PeerConnection");
+       
+       RTCSessionDescription offer = await _peerConnection!.createOffer();
+       await _peerConnection!.setLocalDescription(offer);
+       
+       _send('offer', {
+         'sdp': offer.sdp,
+         'type': offer.type,
+       });
+     } catch (e) {
+       print("❌ SignalingService.startCall failed: $e");
+       rethrow;
+     }
   }
 
   // Receiver: Accept an incoming call
@@ -219,13 +227,17 @@ class SignalingService {
     };
 
     try {
+      if (navigator.mediaDevices == null) throw Exception("MediaDevices not available");
+      
       var stream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
       _localStream = stream;
       if (onLocalStream != null) {
           onLocalStream!(stream);
       }
     } catch (e) {
-      print(e);
+      print("❌ SignalingService._openUserMedia failed: $e");
+      _localStream = null;
+      rethrow;
     }
   }
 
