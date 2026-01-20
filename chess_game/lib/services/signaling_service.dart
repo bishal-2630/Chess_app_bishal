@@ -42,7 +42,10 @@ class SignalingService {
   };
 
   // Connect using a full URL (e.g., ws://... or wss://...)
-  void connect(String socketUrl) {
+  void connect(String socketUrl) async {
+    // Clean up any existing connection first
+    await disconnect();
+    
     print('Connecting to signaling server: $socketUrl');
     try {
       _channel = connectWithHeaders(

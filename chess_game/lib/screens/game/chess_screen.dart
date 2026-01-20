@@ -95,6 +95,17 @@ class _ChessGameScreenState extends State<ChessScreen> {
     }
   }
 
+  @override
+  void didUpdateWidget(ChessScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If room info changes while already on the board, reconnect
+    if (widget.roomId != oldWidget.roomId && widget.roomId != null) {
+      print("🔄 Room ID changed from ${oldWidget.roomId} to ${widget.roomId}. Reconnecting...");
+      _playerColor = widget.color ?? 'w';
+      _connectRoom(_defaultServerUrl, widget.roomId!);
+    }
+  }
+
   Future<void> _initRenderers() async {
     await _localRenderer.initialize();
     await _remoteRenderer.initialize();
