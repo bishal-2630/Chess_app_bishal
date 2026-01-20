@@ -420,11 +420,35 @@ class DjangoAuthService {
     try {
       print('🔄 Signing out from Django');
       
-      if (_isGuest) {
-        logoutGuest();
-      } else {
-        // Call Django logout endpoint
+      // Capture refresh token before clearing
+      final String? tokenToBlacklist = _refreshToken;
+
+      // 1. CLEAR LOCAL STATE IMMEDIATELY (Instant UI response)
+      _currentUser = null;
+      _isGuest = false;
+      _guestName = null;
+      _accessToken = null;
+      _refreshToken = null;
+      
+      // Clear cookies
+      try {
+        await _clearCookies();
+      } catch (e) {
+        print('⚠️ Cookie clearing failed: $e');
+      }
+      
+      // Sign out from Google
+      try {
+        await _googleSignIn.signOut();
+      } catch (e) {
+        print('⚠️ Google sign out failed: $e');
+      }
+
+      // 2. INFORMLY CALL BACKEND (Don't block UI if this is slow)
+      if (tokenToBlacklist != null) {
         final url = '${_baseUrl}logout/';
+        print('📡 Sending blacklist request to: $url');
+        
         try {
           await http.post(
             Uri.parse(url),
@@ -432,19 +456,11 @@ class DjangoAuthService {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
             },
-          );
+            body: json.encode({'refresh': tokenToBlacklist}),
+          ).timeout(const Duration(seconds: 3));
         } catch (e) {
-          print('⚠️ Django logout endpoint failed, but clearing local state');
+          print('ℹ️ Backend logout call result: User logged out locally ($e)');
         }
-        
-        // Clear local state
-        _currentUser = null;
-        
-        // Clear cookies
-        await _clearCookies();
-        
-        // Sign out from Google
-        await _googleSignIn.signOut();
       }
       
       print('✅ Signed out successfully');
