@@ -54,8 +54,12 @@ class SignalingService {
       );
       
       _channel!.stream.listen((message) {
-        print('Received message: $message');
-        _onMessage(jsonDecode(message));
+        try {
+          print('📞 Received message: $message');
+          _onMessage(jsonDecode(message));
+        } catch (e) {
+          print('❌ Error parsing/handling message: $e');
+        }
       }, onDone: () {
         print('WebSocket Closed');
         if (onConnectionState != null) onConnectionState!(false);
@@ -213,9 +217,12 @@ class SignalingService {
     };
 
     // Add local stream
-    if (_localStream != null) {
+    if (_localStream != null && _peerConnection != null) {
+      print("📞 Adding local tracks to PeerConnection");
       _localStream!.getTracks().forEach((track) {
-         _peerConnection!.addTrack(track, _localStream!);
+         if (_peerConnection != null) {
+           _peerConnection!.addTrack(track, _localStream!);
+         }
       });
     }
   }
@@ -242,22 +249,41 @@ class SignalingService {
   }
 
   Future<void> _handleAnswer(Map<String, dynamic> data) async {
-     var description = RTCSessionDescription(data['sdp'], data['type']);
-     await _peerConnection!.setRemoteDescription(description);
+    try {
+      if (_peerConnection == null) {
+        print("⚠️ Cannot handle answer: PeerConnection is null");
+        return;
+      }
+      print("📞 Setting remote description (answer)");
+      var description = RTCSessionDescription(data['sdp'], data['type']);
+      
+      // Secondary check before await
+      if (_peerConnection == null) return;
+      
+      await _peerConnection!.setRemoteDescription(description);
+      print("✅ Remote description set successfully");
+    } catch (e) {
+      print("❌ Error handling answer: $e");
+    }
   }
 
   Future<void> _handleCandidate(Map<String, dynamic> data) async {
-    var candidate = RTCIceCandidate(
-      data['candidate'], 
-      data['sdpMid'], 
-      data['sdpMLineIndex']
-    );
-    
-    if (_peerConnection != null) {
-       await _peerConnection!.addCandidate(candidate);
-    } else {
-       // Queue candidate if PC not ready (e.g. slight race in accepting)
-       _remoteCandidates.add(candidate);
+    try {
+      var candidate = RTCIceCandidate(
+        data['candidate'], 
+        data['sdpMid'], 
+        data['sdpMLineIndex']
+      );
+      
+      if (_peerConnection != null) {
+         print("📞 Adding ICE candidate");
+         await _peerConnection!.addCandidate(candidate);
+      } else {
+         print("⏳ Queueing ICE candidate (PC not ready)");
+         _remoteCandidates.add(candidate);
+      }
+    } catch (e) {
+      print("❌ Error adding candidate: $e");
     }
   }
 
