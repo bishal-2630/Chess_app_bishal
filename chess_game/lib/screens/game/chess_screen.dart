@@ -275,6 +275,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
 
   @override
   void dispose() {
+    print("🧹 Disposing ChessScreen state");
     _statusTimer?.cancel();
     _localRenderer.dispose();
     _remoteRenderer.dispose();
@@ -2057,13 +2058,5 @@ class _ChessGameScreenState extends State<ChessScreen> {
     );
   }
 
-  @override
-  void dispose() {
-    print("🧹 Disposing ChessScreen state");
-    _statusTimer?.cancel();
-    _localRenderer.dispose();
-    _remoteRenderer.dispose();
-    _signalingService.stopAudio();
-    super.dispose();
-  }
+
 }
