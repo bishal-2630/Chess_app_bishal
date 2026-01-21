@@ -250,8 +250,12 @@ class DjangoAuthService {
         // Store user data
         _currentUser = responseData['user'];
         
-        // Store tokens
-        if (responseData['tokens'] != null) {
+        // Store tokens (Backend returns them at root level)
+        if (responseData['access'] != null) {
+          _accessToken = responseData['access'];
+          _refreshToken = responseData['refresh'];
+        } else if (responseData['tokens'] != null) {
+          // Fallback if backend changes
           _accessToken = responseData['tokens']['access'];
           _refreshToken = responseData['tokens']['refresh'];
         }
