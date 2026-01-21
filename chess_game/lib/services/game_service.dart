@@ -2,19 +2,29 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../../services/config.dart';
+import 'django_auth_service.dart';
 
 class GameService {
   static String get _baseUrl => AppConfig.baseUrl;
+
+  // Helper to get headers with JWT token
+  static Future<Map<String, String>> _getAuthHeaders() async {
+    final authService = DjangoAuthService();
+    final token = authService.accessToken;
+    
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
 
   // Get online users
   static Future<Map<String, dynamic>> getOnlineUsers() async {
     try {
       final response = await http.get(
         Uri.parse('${_baseUrl}users/online/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+        headers: await _getAuthHeaders(),
       );
 
       if (response.statusCode == 200) {
@@ -37,10 +47,7 @@ class GameService {
     try {
       final response = await http.get(
         Uri.parse('${_baseUrl}users/all/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+        headers: await _getAuthHeaders(),
       );
 
       if (response.statusCode == 200) {
@@ -65,11 +72,8 @@ class GameService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('${_baseUrl}api/auth/users/status/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+        Uri.parse('${_baseUrl}users/status/'),
+        headers: await _getAuthHeaders(),
         body: json.encode({
           'is_online': isOnline,
           'room_id': roomId,
@@ -99,11 +103,8 @@ class GameService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('${_baseUrl}api/auth/invitations/send/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+        Uri.parse('${_baseUrl}invitations/send/'),
+        headers: await _getAuthHeaders(),
         body: json.encode({
           'receiver_username': receiverUsername,
           'room_id': roomId,
@@ -133,11 +134,8 @@ class GameService {
   static Future<Map<String, dynamic>> getMyInvitations() async {
     try {
       final response = await http.get(
-        Uri.parse('${_baseUrl}api/auth/invitations/my/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+        Uri.parse('${_baseUrl}invitations/my/'),
+        headers: await _getAuthHeaders(),
       );
 
       if (response.statusCode == 200) {
@@ -162,11 +160,8 @@ class GameService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('${_baseUrl}api/auth/invitations/$invitationId/respond/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+        Uri.parse('${_baseUrl}invitations/$invitationId/respond/'),
+        headers: await _getAuthHeaders(),
         body: json.encode({
           'action': action,
         }),
@@ -197,11 +192,8 @@ class GameService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('${_baseUrl}api/auth/invitations/$invitationId/cancel/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+        Uri.parse('${_baseUrl}invitations/$invitationId/cancel/'),
+        headers: await _getAuthHeaders(),
       );
 
       if (response.statusCode == 200) {

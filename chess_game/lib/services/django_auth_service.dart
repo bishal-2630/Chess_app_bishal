@@ -29,6 +29,7 @@ class DjangoAuthService {
   bool get isLoggedIn => _currentUser != null || _isGuest;
   bool get isGuest => _isGuest;
   String? get guestName => _guestName;
+  String? get accessToken => _accessToken;
 
   String get _baseUrl {
     return AppConfig.baseUrl;
