@@ -250,6 +250,12 @@ class DjangoAuthService {
         // Store user data
         _currentUser = responseData['user'];
         
+        // Store tokens
+        if (responseData['tokens'] != null) {
+          _accessToken = responseData['tokens']['access'];
+          _refreshToken = responseData['tokens']['refresh'];
+        }
+        
         // Handle cookies for web view
         String? rawCookie = response.headers['set-cookie'];
         if (rawCookie != null) {
