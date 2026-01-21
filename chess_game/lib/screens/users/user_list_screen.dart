@@ -210,7 +210,7 @@ class UserCard extends StatelessWidget {
                   ? Icon(
                       Icons.person,
                       size: 24,
-                      color: Colors.blue[800],
+                      color: isOnline ? Colors.green : Colors.grey,
                     )
                   : null,
             ),
