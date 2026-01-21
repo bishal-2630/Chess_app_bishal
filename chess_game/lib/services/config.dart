@@ -1,25 +1,65 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 class AppConfig {
-  // Update this with your Railway WebSocket backend URL
-  // Use 10.0.2.2 for Android Emulator, or your local machine IP for physical devices
-  static const String _localDevHost = '10.0.2.2:8000'; 
+  // ============================================================================
+  // ENVIRONMENT CONFIGURATION
+  // ============================================================================
   
-  // For development, you can override with environment variable
+  // Set to true for local development, false for production
+  static const bool _isDevelopment = false;
+  
+  // Production Railway backend URL
+  static const String _productionHost = 'chess-game-app-production.up.railway.app';
+  
+  // Local development configuration
+  static const String _physicalDeviceHost = '192.168.1.76:8000'; 
+  static const String _emulatorHost = '10.0.2.2:8000'; 
+  
+  // ============================================================================
+  // HOST SELECTION LOGIC
+  // ============================================================================
+  
   static String get _host {
+    // Production mode: use Railway backend
+    if (!_isDevelopment) {
+      return _productionHost;
+    }
+    
+    // Development mode: detect emulator vs physical device
+    // Check for environment variable override first
     const String envHost = String.fromEnvironment('WEBSOCKET_HOST', defaultValue: '');
-    return envHost.isNotEmpty ? envHost : _localDevHost;
+    if (envHost.isNotEmpty) return envHost;
+    
+    // For Android: detect emulator vs physical device
+    if (!kIsWeb && Platform.isAndroid) {
+      final isEmulator = Platform.environment['ANDROID_EMULATOR'] == 'true' ||
+                        Platform.version.contains('emulator');
+      
+      return isEmulator ? _emulatorHost : _physicalDeviceHost;
+    }
+    
+    // Default to emulator host for other platforms
+    return _emulatorHost;
   }
+
+  // ============================================================================
+  // API ENDPOINTS
+  // ============================================================================
 
   static String get baseUrl {
     if (kIsWeb) return 'http://localhost:8000/api/auth/';
-    // Point to local server for Emulator
-    return 'http://$_host/api/auth/';
+    
+    // Use HTTPS for production, HTTP for local development
+    final protocol = _isDevelopment ? 'http' : 'https';
+    return '$protocol://$_host/api/auth/';
   }
 
   static String get socketUrl {
-    if (kIsWeb) return "wss://$_host/ws/call/";
-    // Production Railway URL
-    return "wss://$_host/ws/call/";
+    if (kIsWeb) return "ws://localhost:8000/ws/call/";
+    
+    // Use WSS for production, WS for local development
+    final protocol = _isDevelopment ? 'ws' : 'wss';
+    return "$protocol://$_host/ws/call/";
   }
 }
