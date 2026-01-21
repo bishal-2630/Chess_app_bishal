@@ -62,9 +62,8 @@ class _UserListScreenState extends State<UserListScreen> {
     
     return users.where((user) {
       final username = user['username']?.toString().toLowerCase() ?? '';
-      final email = user['email']?.toString().toLowerCase() ?? '';
       final query = _searchQuery.toLowerCase();
-      return username.contains(query) || email.contains(query);
+      return username.contains(query);
     }).toList();
   }
 
@@ -278,14 +277,27 @@ class UserCard extends StatelessWidget {
             ),
             
             // Invite button
-            ElevatedButton.icon(
-              onPressed: isOnline ? onInvite : null,
-              icon: const Icon(Icons.play_arrow),
-              label: const Text('Challenge'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isOnline ? Colors.blue : Colors.grey,
-                foregroundColor: Colors.white,
-              ),
+            // Actions
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Call Button
+                IconButton(
+                  icon: const Icon(Icons.call),
+                  color: Colors.green,
+                  onPressed: isOnline 
+                      ? () => print('Call ${user['username']}') // TODO: Implement call
+                      : null,
+                  tooltip: 'Call',
+                ),
+                // Challenge Button (Icon Only)
+                IconButton(
+                  icon: const Icon(Icons.videogame_asset),
+                  color: Colors.blue,
+                  onPressed: isOnline ? onInvite : null,
+                  tooltip: 'Challenge',
+                ),
+              ],
             ),
           ],
         ),
