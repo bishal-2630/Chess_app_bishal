@@ -210,6 +210,7 @@ class GameService {
           'error': errorData['error'] ?? 'Failed to cancel invitation'
         };
       }
+    } catch (e) {
       return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }

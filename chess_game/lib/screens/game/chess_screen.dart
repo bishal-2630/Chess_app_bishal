@@ -274,6 +274,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
   }
 
   @override
+  void dispose() {
     print("🧹 Disposing ChessScreen state");
     _statusTimer?.cancel();
     _localRenderer.dispose();
