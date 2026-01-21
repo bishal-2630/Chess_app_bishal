@@ -313,7 +313,8 @@ class _ChessGameScreenState extends State<ChessScreen> {
     });
 
     print("Connecting to $fullUrl");
-    _signalingService.connect(fullUrl);
+    final token = await _authService.accessToken;
+    _signalingService.connect(fullUrl, token: token);
 
     // Note: Success state is set via onConnectionState callback
   }

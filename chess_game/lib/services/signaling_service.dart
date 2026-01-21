@@ -44,15 +44,20 @@ class SignalingService {
   };
 
   // Connect using a full URL (e.g., ws://... or wss://...)
-  void connect(String socketUrl) async {
+  void connect(String socketUrl, {String? token}) async {
     // Clean up any existing connection first
     await disconnect();
     
     print('Connecting to signaling server: $socketUrl');
     try {
+      final headers = {'ngrok-skip-browser-warning': 'true'};
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+
       _channel = connectWithHeaders(
         socketUrl,
-        {'ngrok-skip-browser-warning': 'true'},
+        headers,
       );
       
       _channel!.stream.listen((message) {

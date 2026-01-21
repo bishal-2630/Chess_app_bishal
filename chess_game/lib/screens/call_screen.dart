@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../services/signaling_service.dart';
 import '../services/config.dart';
+import '../services/django_auth_service.dart';
 
 class CallScreen extends StatefulWidget {
   final String roomId;
@@ -14,6 +15,7 @@ class CallScreen extends StatefulWidget {
 }
 
 class _CallScreenState extends State<CallScreen> {
+  final DjangoAuthService _authService = DjangoAuthService(); // Add Auth Service
   SignalingService _signalingService = SignalingService();
   RTCVideoRenderer _localRenderer = RTCVideoRenderer();
   RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
@@ -55,7 +57,8 @@ class _CallScreenState extends State<CallScreen> {
     String fullUrl = baseUrl + widget.roomId + "/";
     
     print("📞 Connecting to call room: $fullUrl");
-    _signalingService.connect(fullUrl);
+    final token = await _authService.accessToken;
+    _signalingService.connect(fullUrl, token: token);
   }
 
   @override
