@@ -10,7 +10,7 @@ class GameService {
   static Future<Map<String, dynamic>> getOnlineUsers() async {
     try {
       final response = await http.get(
-        Uri.parse('${_baseUrl}api/auth/users/online/'),
+        Uri.parse('${_baseUrl}users/online/'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -25,16 +25,10 @@ class GameService {
           'count': data['count']
         };
       } else {
-        return {
-          'success': false,
-          'error': 'Failed to load online users'
-        };
+        return {'success': false, 'error': 'Failed to load online users'};
       }
     } catch (e) {
-      return {
-        'success': false,
-        'error': 'Network error: ${e.toString()}'
-      };
+      return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }
 
@@ -42,7 +36,7 @@ class GameService {
   static Future<Map<String, dynamic>> getAllUsers() async {
     try {
       final response = await http.get(
-        Uri.parse('${_baseUrl}api/auth/users/all/'),
+        Uri.parse('${_baseUrl}users/all/'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -57,16 +51,10 @@ class GameService {
           'count': data['count']
         };
       } else {
-        return {
-          'success': false,
-          'error': 'Failed to load users'
-        };
+        return {'success': false, 'error': 'Failed to load users'};
       }
     } catch (e) {
-      return {
-        'success': false,
-        'error': 'Network error: ${e.toString()}'
-      };
+      return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }
 
@@ -97,16 +85,10 @@ class GameService {
           'current_room': data['current_room']
         };
       } else {
-        return {
-          'success': false,
-          'error': 'Failed to update status'
-        };
+        return {'success': false, 'error': 'Failed to update status'};
       }
     } catch (e) {
-      return {
-        'success': false,
-        'error': 'Network error: ${e.toString()}'
-      };
+      return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }
 
@@ -143,10 +125,7 @@ class GameService {
         };
       }
     } catch (e) {
-      return {
-        'success': false,
-        'error': 'Network error: ${e.toString()}'
-      };
+      return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }
 
@@ -169,16 +148,10 @@ class GameService {
           'count': data['count']
         };
       } else {
-        return {
-          'success': false,
-          'error': 'Failed to load invitations'
-        };
+        return {'success': false, 'error': 'Failed to load invitations'};
       }
     } catch (e) {
-      return {
-        'success': false,
-        'error': 'Network error: ${e.toString()}'
-      };
+      return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }
 
@@ -214,10 +187,7 @@ class GameService {
         };
       }
     } catch (e) {
-      return {
-        'success': false,
-        'error': 'Network error: ${e.toString()}'
-      };
+      return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }
 
@@ -236,10 +206,7 @@ class GameService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return {
-          'success': data['success'],
-          'message': data['message']
-        };
+        return {'success': data['success'], 'message': data['message']};
       } else {
         final errorData = json.decode(response.body);
         return {
@@ -248,10 +215,7 @@ class GameService {
         };
       }
     } catch (e) {
-      return {
-        'success': false,
-        'error': 'Network error: ${e.toString()}'
-      };
+      return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }
 }

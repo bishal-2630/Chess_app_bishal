@@ -18,6 +18,7 @@ dependencies:
   web_socket_channel: ^2.4.0
   permission_handler: ^11.3.0
   flutter_inappwebview: ^6.0.0
+  audioplayers: ^5.2.1
 
 dev_dependencies:
   flutter_test:
