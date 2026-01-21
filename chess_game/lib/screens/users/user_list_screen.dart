@@ -15,7 +15,6 @@ class _UserListScreenState extends State<UserListScreen> {
   List<dynamic> _onlineUsers = [];
   List<dynamic> _allUsers = [];
   bool _isLoading = true;
-  bool _showOnlineOnly = true;
   String _searchQuery = '';
 
   @override
@@ -30,21 +29,12 @@ class _UserListScreenState extends State<UserListScreen> {
     });
 
     try {
-      if (_showOnlineOnly) {
-        final result = await GameService.getOnlineUsers();
-        if (result['success']) {
-          setState(() {
-            _onlineUsers = result['users'];
-          });
-        }
-      } else {
         final result = await GameService.getAllUsers();
         if (result['success']) {
           setState(() {
             _allUsers = result['users'];
           });
         }
-      }
     } catch (e) {
       print('Error loading users: $e');
     } finally {
@@ -55,7 +45,7 @@ class _UserListScreenState extends State<UserListScreen> {
   }
 
   List<dynamic> get _filteredUsers {
-    final users = _showOnlineOnly ? _onlineUsers : _allUsers;
+    final users = _allUsers;
     if (_searchQuery.isEmpty) {
       return users;
     }
@@ -100,22 +90,12 @@ class _UserListScreenState extends State<UserListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_showOnlineOnly ? 'Online Players' : 'All Players'),
+        title: const Text('All Players'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/chess'),
         ),
         actions: [
-          IconButton(
-            icon: Icon(_showOnlineOnly ? Icons.people : Icons.people_outline),
-            onPressed: () {
-              setState(() {
-                _showOnlineOnly = !_showOnlineOnly;
-              });
-              _loadUsers();
-            },
-            tooltip: _showOnlineOnly ? 'Show All Players' : 'Show Online Only',
-          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadUsers,
@@ -154,15 +134,13 @@ class _UserListScreenState extends State<UserListScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              _showOnlineOnly ? Icons.person_off : Icons.people,
+                              Icons.people,
                               size: 64,
                               color: Colors.grey[400],
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              _showOnlineOnly 
-                                  ? 'No online players'
-                                  : 'No players found',
+                              'No players found',
                               style: TextStyle(
                                 fontSize: 18,
                                 color: Colors.grey[600],
@@ -290,9 +268,9 @@ class UserCard extends StatelessWidget {
                       : null,
                   tooltip: 'Call',
                 ),
-                // Challenge Button (Icon Only)
+                // Challenge Button 
                 IconButton(
-                  icon: const Icon(Icons.videogame_asset),
+                  icon: const Icon(Icons.play_arrow),
                   color: Colors.blue,
                   onPressed: isOnline ? onInvite : null,
                   tooltip: 'Challenge',
