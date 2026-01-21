@@ -50,8 +50,12 @@ class GameService {
         headers: await _getAuthHeaders(),
       );
 
+      print('📡 Users API Response: ${response.statusCode}');
+      print('📦 Body: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        print('📋 Users parsed: ${data['users']}');
         return {
           'success': true,
           'users': data['users'],
