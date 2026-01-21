@@ -50,13 +50,16 @@ class SignalingService {
     
     print('Connecting to signaling server: $socketUrl');
     try {
+      String urlWithToken = socketUrl;
       final headers = {'ngrok-skip-browser-warning': 'true'};
       if (token != null) {
         headers['Authorization'] = 'Bearer $token';
+        // Also add as query param for robustness (some proxies strip headers)
+        urlWithToken += '?token=$token';
       }
 
       _channel = connectWithHeaders(
-        socketUrl,
+        urlWithToken,
         headers,
       );
       

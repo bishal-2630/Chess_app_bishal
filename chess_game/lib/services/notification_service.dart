@@ -4,6 +4,9 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:flutter/foundation.dart';
 import '../../services/config.dart';
 
+import '../../services/django_auth_service.dart';
+import './websocket_helper.dart';
+
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
@@ -27,7 +30,17 @@ class NotificationService {
       final notificationUrl = '${AppConfig.socketUrl.replaceAll('/ws/call/', '/ws/notifications/')}';
       print('🔔 Connecting to notification service: $notificationUrl');
 
-      _channel = WebSocketChannel.connect(Uri.parse(notificationUrl));
+      // Get Authentication Token
+      final token = await DjangoAuthService().accessToken;
+      String urlWithToken = notificationUrl;
+      final Map<String, String> headers = {};
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+        // Also add as query param for robustness (some proxies strip headers)
+        urlWithToken += '?token=$token';
+      }
+
+      _channel = connectWithHeaders(urlWithToken, headers);
 
       _channel!.stream.listen(
         (message) {

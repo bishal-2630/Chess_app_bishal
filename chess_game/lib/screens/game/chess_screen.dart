@@ -85,7 +85,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
     super.initState();
     _initializeBoard();
     _initRenderers();
-    _notificationService.connect();
+    // NotificationService is now connected globally upon login
 
     // Auto-connect if parameters provided via route
     if (widget.roomId != null) {
@@ -274,13 +274,12 @@ class _ChessGameScreenState extends State<ChessScreen> {
   }
 
   @override
-  void dispose() {
     print("🧹 Disposing ChessScreen state");
     _statusTimer?.cancel();
     _localRenderer.dispose();
     _remoteRenderer.dispose();
     _signalingService.hangUp();
-    _notificationService.disconnect();
+    // Notification service lifecycle is now managed by DjangoAuthService
     super.dispose();
   }
 

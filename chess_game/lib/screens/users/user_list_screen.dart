@@ -264,7 +264,14 @@ class UserCard extends StatelessWidget {
                   icon: const Icon(Icons.call),
                   color: Colors.green,
                   onPressed: isOnline 
-                      ? () => print('Call ${user['username']}') // TODO: Implement call
+                      ? () {
+                          // Generate a room ID for the call
+                          final roomId = 'call_${DateTime.now().millisecondsSinceEpoch}';
+                          // Navigate to call screen as Caller
+                          context.push(
+                            '/call?roomId=$roomId&otherUserName=${user['username']}&isCaller=true'
+                          );
+                        }
                       : null,
                   tooltip: 'Call',
                 ),

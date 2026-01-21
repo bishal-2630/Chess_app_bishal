@@ -21,48 +21,64 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+  @override
+  Widget build(BuildContext context) {
     final GoRouter router = GoRouter(
       initialLocation: '/login',
       routes: [
-        GoRoute(
-          path: '/login',
-          builder: (context, state) => const LoginScreen(),
-        ),
-        GoRoute(
-          path: '/register',
-          builder: (context, state) => const RegisterScreen(),
-        ),
-        GoRoute(
-          path: '/forgot-password',
-          builder: (context, state) => const ForgotPasswordScreen(),
-        ),
-        GoRoute(
-          path: '/chess',
-          builder: (context, state) {
-            final roomId = state.uri.queryParameters['roomId'];
-            final color = state.uri.queryParameters['color'];
-            return ChessScreen(roomId: roomId, color: color);
+        ShellRoute(
+          builder: (context, state, child) {
+            return IncomingCallWrapper(child: child);
           },
-        ),
-        GoRoute(
-          path: '/profile',
-          builder: (context, state) => const ProfileScreen(),
-        ),
-        GoRoute(
-          path: '/call',
-          builder: (context, state) {
-            final roomId = state.uri.queryParameters['roomId'] ?? 'testroom';
-            final callerName = state.uri.queryParameters['callerName'] ?? '';
-            return CallScreen(roomId: roomId, callerName: callerName);
-          },
-        ),
-        GoRoute(
-          path: '/users',
-          builder: (context, state) => const UserListScreen(),
-        ),
-        GoRoute(
-          path: '/invitations',
-          builder: (context, state) => const InvitationsScreen(),
+          routes: [
+            GoRoute(
+              path: '/login',
+              builder: (context, state) => const LoginScreen(),
+            ),
+            GoRoute(
+              path: '/register',
+              builder: (context, state) => const RegisterScreen(),
+            ),
+            GoRoute(
+              path: '/forgot-password',
+              builder: (context, state) => const ForgotPasswordScreen(),
+            ),
+            GoRoute(
+              path: '/chess',
+              builder: (context, state) {
+                final roomId = state.uri.queryParameters['roomId'];
+                final color = state.uri.queryParameters['color'];
+                return ChessScreen(roomId: roomId, color: color);
+              },
+            ),
+            GoRoute(
+              path: '/profile',
+              builder: (context, state) => const ProfileScreen(),
+            ),
+            GoRoute(
+              path: '/call',
+              builder: (context, state) {
+                final roomId = state.uri.queryParameters['roomId'] ?? 'testroom';
+                final otherUserName = state.uri.queryParameters['otherUserName'] ?? 
+                                      state.uri.queryParameters['callerName'] ?? 'Unknown';
+                final isCaller = state.uri.queryParameters['isCaller'] == 'true';
+                
+                return CallScreen(
+                  roomId: roomId, 
+                  otherUserName: otherUserName,
+                  isCaller: isCaller,
+                );
+              },
+            ),
+            GoRoute(
+              path: '/users',
+              builder: (context, state) => const UserListScreen(),
+            ),
+            GoRoute(
+              path: '/invitations',
+              builder: (context, state) => const InvitationsScreen(),
+            ),
+          ],
         ),
       ],
       redirect: (context, state) {
@@ -96,5 +112,117 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
     );
+  }
+}
+
+class IncomingCallWrapper extends StatefulWidget {
+  final Widget child;
+  const IncomingCallWrapper({Key? key, required this.child}) : super(key: key);
+
+  @override
+  _IncomingCallWrapperState createState() => _IncomingCallWrapperState();
+}
+
+class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
+  @override
+  void initState() {
+    super.initState();
+    _listenForNotifications();
+  }
+
+  void _listenForNotifications() {
+    NotificationService().notifications.listen((data) {
+      if (data['type'] == 'call_invitation') {
+        _showIncomingCallDialog(data['data']);
+      }
+    });
+  }
+
+  void _showIncomingCallDialog(Map<String, dynamic> callData) {
+    if (!mounted) return;
+    
+    final caller = callData['caller'];
+    final roomId = callData['room_id'];
+    
+    showDialog(
+      context: context, // This context works because it's inside MaterialApp builder? 
+                        // Actually, this context is ABOVE the Navigator if wrapping child.
+                        // We need a context that has a Material ancestor? 
+                        // MaterialApp -> builder -> IncomingCallWrapper -> child(Navigator).
+                        // So IncomingCallWrapper is inside MaterialApp. It should work.
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Incoming Call'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(
+              child: Text(caller[0].toUpperCase()),
+            ),
+            const SizedBox(height: 16),
+            Text('$caller is calling you...'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+               Navigator.of(dialogContext).pop();
+               // Decline logic here if needed (send signal)
+            },
+            child: const Text('Decline', style: TextStyle(color: Colors.red)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              // Navigate to call screen as Callee (isCaller=false)
+              // We need to use GoRouter to push.
+              // Since the context here is valid, we can try GoRouter.of(context).
+              // However, GoRouter might not be found if IncomingCallWrapper is 
+              // strictly between MaterialApp and Router? 
+              // Actually MaterialApp.router uses the router as the navigator.
+              // builder wraps the navigator. So child IS the navigator (or router output).
+              // So context below IncomingCallWrapper has the Router? 
+              // IncomingCallWrapper's context might NOT have the Router if it's a parent of it.
+              // BUT, GoRouter is passed to MaterialApp.routerConfig.
+              // The `child` passed to builder IS the Widget built by the router.
+              // So GoRouter IS in the tree? 
+              // Wait. `MaterialApp.router` uses `routerConfig`.
+              // The `builder` wraps the `child` which is the result of `router`.
+              // So `GoRouter.of(context)` should work? NO, because `IncomingCallWrapper` 
+              // is PARENT of the router outlet?
+              // Actually, `builder` in `MaterialApp` wraps the `Navigator` created by the `RouterDelegate`.
+              // So `IncomingCallWrapper` is PARENT of `Navigator`.
+              // So `GoRouter` (which relies on `InheritedWidget` inside logic) might be accessible 
+              // if it places itself above the builder? 
+              // Usually `GoRouter` injects itself. 
+              
+              // Safest bet: Use the router object directly if accessible or try context.go.
+              // Since `router` is local in `build`, we can't access it here.
+              // But we can use `GoRouter.of(context)` might fail.
+              
+              // ALTERNATIVE: Use a GlobalKey for the GoRouter navigator?
+              // Or just try `context.push`. If it fails, we know why.
+              
+              try {
+                GoRouter.of(context).push('/call?roomId=$roomId&otherUserName=$caller&isCaller=false');
+              } catch (e) {
+                // If GoRouter lookup fails, try Navigator? 
+                // Getting navigator from this context might fail if we are above it.
+                // Actually `child` IS the navigator.
+                // So we can't easily navigate FROM `IncomingCallWrapper` context without a key.
+                print("Navigation failed: $e");
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Accept'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
   }
 }

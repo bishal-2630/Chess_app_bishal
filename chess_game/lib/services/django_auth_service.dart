@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../services/config.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../../services/notification_service.dart';
 
 class DjangoAuthService {
   // Singleton pattern
@@ -86,6 +87,9 @@ class DjangoAuthService {
             _accessToken = responseData['tokens']['access'];
             _refreshToken = responseData['tokens']['refresh'];
           }
+          
+          // Connect to Notification Service to show user online
+          NotificationService().connect();
           
           return {
             'success': true,
@@ -176,6 +180,10 @@ class DjangoAuthService {
         }
         
         print('✅ Django registration successful: ${_currentUser?['email']}');
+        
+        // Connect to Notification Service to show user online
+        NotificationService().connect();
+        
         return {
           'success': true,
           'user': _currentUser,
@@ -268,6 +276,10 @@ class DjangoAuthService {
         }
         
         print('✅ Google sign in successful: ${_currentUser?['email']}');
+        
+        // Connect to Notification Service to show user online
+        NotificationService().connect();
+        
         return {
           'success': true,
           'user': _currentUser,
@@ -439,6 +451,9 @@ class DjangoAuthService {
       _guestName = null;
       _accessToken = null;
       _refreshToken = null;
+      
+      // Disconnect Notification Service (User goes offline)
+      NotificationService().disconnect();
       
       // Clear cookies
       try {

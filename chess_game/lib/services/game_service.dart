@@ -210,6 +210,30 @@ class GameService {
           'error': errorData['error'] ?? 'Failed to cancel invitation'
         };
       }
+      return {'success': false, 'error': 'Network error: ${e.toString()}'};
+    }
+  }
+
+  // Send call signal
+  static Future<Map<String, dynamic>> sendCallSignal({
+    required String receiverUsername,
+    required String roomId,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${_baseUrl}call/send/'),
+        headers: await _getAuthHeaders(),
+        body: json.encode({
+          'receiver_username': receiverUsername,
+          'room_id': roomId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return {'success': true};
+      } else {
+        return {'success': false, 'error': 'Failed to send call signal'};
+      }
     } catch (e) {
       return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
