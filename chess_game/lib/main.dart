@@ -189,6 +189,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
         actions: [
           TextButton(
             onPressed: () {
+               MqttService().stopAudio();
                Navigator.of(dialogContext).pop();
                // Decline logic here if needed (send signal)
             },
@@ -196,6 +197,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
           ),
           ElevatedButton(
             onPressed: () {
+              MqttService().stopAudio();
               Navigator.of(dialogContext).pop();
               // Navigate to call screen as Callee (isCaller=false)
               // We need to use GoRouter to push.
@@ -258,11 +260,15 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
         content: Text('$sender has challenged you to a game!'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
+            onPressed: () {
+              MqttService().stopAudio();
+              Navigator.of(dialogContext).pop();
+            },
             child: const Text('Ignore'),
           ),
           ElevatedButton(
             onPressed: () {
+              MqttService().stopAudio();
               Navigator.of(dialogContext).pop();
               // Navigate to invitations screen or directly to game
               context.push('/invitations');

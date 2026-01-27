@@ -3,6 +3,7 @@ import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 import './notification_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class MqttService {
   static final MqttService _instance = MqttService._internal();
@@ -13,6 +14,9 @@ class MqttService {
   final String broker = 'broker.emqx.io';
   final int port = 1883;
   bool isConnected = false;
+
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isPlaying = false;
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -100,6 +104,7 @@ class MqttService {
         json.encode(data),
       );
     } else if (type == 'call_invitation') {
+      _playRingtone();
       _showLocalNotification(
         'Incoming Call',
         '${payload['caller']} is calling you...',
@@ -114,12 +119,14 @@ class MqttService {
   Future<void> _showLocalNotification(String title, String body, String payload) async {
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
-      'chess_notifications',
-      'Chess Notifications',
+      'chess_notifications_high',
+      'Chess High Priority',
       channelDescription: 'Notifications for chess challenges and calls',
       importance: Importance.max,
       priority: Priority.high,
       showWhen: true,
+      fullScreenIntent: true,
+      category: AndroidNotificationCategory.call,
     );
     const NotificationDetails platformChannelSpecifics =
         NotificationDetails(android: androidPlatformChannelSpecifics);
@@ -146,8 +153,30 @@ class MqttService {
     print('MQTT: OnSubscribed to topic $topic');
   }
 
+  Future<void> _playRingtone() async {
+    if (_isPlaying) return;
+    try {
+      _isPlaying = true;
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _audioPlayer.play(AssetSource('sounds/ringtone.mp3'));
+    } catch (e) {
+      print('MQTT: Error playing ringtone: $e');
+      _isPlaying = false;
+    }
+  }
+
+  Future<void> stopAudio() async {
+    try {
+      await _audioPlayer.stop();
+      _isPlaying = false;
+    } catch (e) {
+      print('MQTT: Error stopping audio: $e');
+    }
+  }
+
   void disconnect() {
     client?.disconnect();
     isConnected = false;
+    stopAudio();
   }
 }
