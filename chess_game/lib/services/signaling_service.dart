@@ -266,6 +266,10 @@ class SignalingService {
       
       var stream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
       _localStream = stream;
+      
+      // Ensure audio is routed to speaker
+      await Helper.setSpeakerphoneOn(true);
+      
       if (onLocalStream != null) {
           onLocalStream!(stream);
       }

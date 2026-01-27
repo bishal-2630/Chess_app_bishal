@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/game_service.dart';
 import '../../services/django_auth_service.dart';
+import 'dart:async';
 
 class UserListScreen extends StatefulWidget {
   const UserListScreen({super.key});

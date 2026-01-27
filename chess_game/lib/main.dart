@@ -11,6 +11,8 @@ import 'screens/users/invitations_screen.dart';
 import 'services/django_auth_service.dart';
 import 'services/notification_service.dart';
 import 'services/mqtt_service.dart';
+import 'services/game_service.dart';
+import 'dart:async';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
