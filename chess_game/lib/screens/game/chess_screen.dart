@@ -80,11 +80,17 @@ class _ChessGameScreenState extends State<ChessScreen> {
     'bk': '♚',
   };
 
+  int _inviteCount = 0;
+  Timer? _inviteTimer;
+
   @override
   void initState() {
     super.initState();
     _initializeBoard();
     _initRenderers();
+    _loadInviteCount();
+    // Refresh invite count every 30 seconds
+    _inviteTimer = Timer.periodic(const Duration(seconds: 30), (_) => _loadInviteCount());
     // NotificationService is now connected globally upon login
 
     // Auto-connect if parameters provided via route
@@ -93,6 +99,19 @@ class _ChessGameScreenState extends State<ChessScreen> {
         _playerColor = widget.color ?? 'w';
         _connectRoom(_defaultServerUrl, widget.roomId!);
       });
+    }
+  }
+
+  Future<void> _loadInviteCount() async {
+    try {
+      final result = await GameService.getMyInvitations();
+      if (result['success'] && mounted) {
+        setState(() {
+          _inviteCount = result['count'];
+        });
+      }
+    } catch (e) {
+      print('Error loading invite count: $e');
     }
   }
 
@@ -277,6 +296,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
   void dispose() {
     print("🧹 Disposing ChessScreen state");
     _statusTimer?.cancel();
+    _inviteTimer?.cancel();
     _localRenderer.dispose();
     _remoteRenderer.dispose();
     _signalingService.hangUp();
@@ -1990,14 +2010,47 @@ class _ChessGameScreenState extends State<ChessScreen> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => context.go('/invitations'),
-                        icon: const Icon(Icons.mail),
-                        label: const Text('Invites'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              await context.push('/invitations');
+                              _loadInviteCount(); // Refresh when coming back
+                            },
+                            icon: const Icon(Icons.mail),
+                            label: const Text('Invites'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.teal,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                          if (_inviteCount > 0)
+                            Positioned(
+                              right: -5,
+                              top: -5,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                constraints: const BoxConstraints(
+                                  minWidth: 20,
+                                  minHeight: 20,
+                                ),
+                                child: Text(
+                                  '$_inviteCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ],

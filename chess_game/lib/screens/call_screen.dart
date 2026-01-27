@@ -31,6 +31,7 @@ class _CallScreenState extends State<CallScreen> {
   bool _inCall = false;
   String _status = "Connecting...";
   final AudioPlayer _localAudioPlayer = AudioPlayer();
+  bool _isMuted = false;
 
   @override
   void initState() {
@@ -200,13 +201,26 @@ class _CallScreenState extends State<CallScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 FloatingActionButton(
+                  backgroundColor: _isMuted ? Colors.blueGrey : Colors.blue,
+                  onPressed: () {
+                    setState(() {
+                      _isMuted = !_isMuted;
+                      _signalingService.muteAudio(_isMuted);
+                    });
+                  },
+                  heroTag: 'mute_btn',
+                  child: Icon(_isMuted ? Icons.mic_off : Icons.mic),
+                ),
+                const SizedBox(width: 32),
+                FloatingActionButton(
                   backgroundColor: Colors.red,
                   onPressed: () {
                      _signalingService.sendEndCall();
                      _signalingService.hangUp();
                      Navigator.pop(context);
                   },
-                  child: Icon(Icons.call_end),
+                  heroTag: 'hangup_btn',
+                  child: const Icon(Icons.call_end),
                 ),
               ],
             ),

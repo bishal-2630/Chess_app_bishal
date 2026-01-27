@@ -161,6 +161,17 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
     });
   }
 
+  Future<void> _declineInvitation(int invitationId) async {
+    try {
+      await GameService.respondToInvitation(
+        invitationId: invitationId,
+        action: 'decline',
+      );
+    } catch (e) {
+      print('Error declining invitation: $e');
+    }
+  }
+
   void _showIncomingCallDialog(Map<String, dynamic> callData) {
     if (!mounted) return;
     
@@ -249,35 +260,59 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
   void _showGameInvitationDialog(Map<String, dynamic> invData) {
     if (!mounted) return;
 
-    final sender = invData['sender']['username'];
+    final sender = invData['sender']['username'] ?? invData['sender'];
     final roomId = invData['room_id'];
+    final invitationId = invData['id'];
 
+    Timer? expiryTimer;
+    
     showDialog(
       context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Game Challenge'),
-        content: Text('$sender has challenged you to a game!'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              MqttService().stopAudio();
-              Navigator.of(dialogContext).pop();
-            },
-            child: const Text('Ignore'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              MqttService().stopAudio();
-              Navigator.of(dialogContext).pop();
-              // Navigate to invitations screen or directly to game
-              context.push('/invitations');
-            },
-            child: const Text('View'),
-          ),
-        ],
-      ),
-    );
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        // Auto-dismiss after 1 minute
+        expiryTimer = Timer(const Duration(minutes: 1), () {
+          if (mounted) {
+            Navigator.of(dialogContext).pop();
+            _declineInvitation(invitationId);
+          }
+        });
+
+        return AlertDialog(
+          title: const Text('Game Challenge'),
+          content: Text('$sender has challenged you to a game!\n\nThis invitation expires in 60 seconds.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                expiryTimer?.cancel();
+                MqttService().stopAudio();
+                Navigator.of(dialogContext).pop();
+                _declineInvitation(invitationId);
+              },
+              child: const Text('Decline', style: TextStyle(color: Colors.red)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                expiryTimer?.cancel();
+                MqttService().stopAudio();
+                Navigator.of(dialogContext).pop();
+                // Directly Accept
+                GameService.respondToInvitation(
+                  invitationId: invitationId,
+                  action: 'accept',
+                ).then((result) {
+                  if (result['success']) {
+                    context.push('/chess?roomId=$roomId&color=b');
+                  }
+                });
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              child: const Text('Accept'),
+            ),
+          ],
+        );
+      },
+    ).then((_) => expiryTimer?.cancel());
   }
 
   @override

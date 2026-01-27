@@ -16,11 +16,20 @@ class _UserListScreenState extends State<UserListScreen> {
   List<dynamic> _allUsers = [];
   bool _isLoading = true;
   String _searchQuery = '';
+  final Map<String, DateTime> _sentChallenges = {};
+  Timer? _challengeTimer;
 
   @override
   void initState() {
     super.initState();
     _loadUsers();
+    _challengeTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) {
+        setState(() {
+          // Trigger rebuild to refresh "Sent" buttons
+        });
+      }
+    });
   }
 
   Future<void> _loadUsers() async {
@@ -38,10 +47,18 @@ class _UserListScreenState extends State<UserListScreen> {
     } catch (e) {
       print('Error loading users: $e');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
+  }
+
+  @override
+  void dispose() {
+    _challengeTimer?.cancel();
+    super.dispose();
   }
 
   List<dynamic> get _filteredUsers {
@@ -60,6 +77,10 @@ class _UserListScreenState extends State<UserListScreen> {
   Future<void> _sendInvitation(dynamic user) async {
     final roomId = 'room_${DateTime.now().millisecondsSinceEpoch}';
     
+    setState(() {
+      _sentChallenges[user['username']] = DateTime.now();
+    });
+
     final result = await GameService.sendInvitation(
       receiverUsername: user['username'],
       roomId: roomId,
@@ -164,10 +185,17 @@ class _UserListScreenState extends State<UserListScreen> {
                           itemCount: _filteredUsers.length,
                           itemBuilder: (context, index) {
                             final user = _filteredUsers[index];
+                            final lastSent = _sentChallenges[user['username']];
+                            bool isRecent = false;
+                            if (lastSent != null) {
+                              isRecent = DateTime.now().difference(lastSent).inMinutes < 1;
+                            }
+                            
                             return UserCard(
                               user: user,
-                              onInvite: () => _sendInvitation(user),
+                              onInvite: isRecent ? null : () => _sendInvitation(user),
                               isOnline: user['is_online'] ?? false,
+                              isRecent: isRecent,
                             );
                           },
                         ),
@@ -181,14 +209,16 @@ class _UserListScreenState extends State<UserListScreen> {
 
 class UserCard extends StatelessWidget {
   final dynamic user;
-  final VoidCallback onInvite;
+  final VoidCallback? onInvite;
   final bool isOnline;
+  final bool isRecent;
 
   const UserCard({
     super.key,
     required this.user,
     required this.onInvite,
     required this.isOnline,
+    required this.isRecent,
   });
 
   @override
@@ -275,10 +305,10 @@ class UserCard extends StatelessWidget {
                 ),
                 // Challenge Button 
                 IconButton(
-                  icon: const Icon(Icons.play_arrow),
-                  color: Colors.blue,
+                  icon: Icon(isRecent ? Icons.hourglass_empty : Icons.play_arrow),
+                  color: isRecent ? Colors.grey : Colors.blue,
                   onPressed: onInvite,
-                  tooltip: 'Challenge',
+                  tooltip: isRecent ? 'Sent (Expires in 1m)' : 'Challenge',
                 ),
               ],
             ),
