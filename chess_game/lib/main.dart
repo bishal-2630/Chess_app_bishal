@@ -10,9 +10,15 @@ import 'screens/users/user_list_screen.dart';
 import 'screens/users/invitations_screen.dart';
 import 'services/django_auth_service.dart';
 import 'services/notification_service.dart';
+import 'services/mqtt_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize MQTT Service (sets up local notifications)
+  final mqttService = MqttService();
+  await mqttService.initialize();
+  
   runApp(MyApp());
 }
 
@@ -127,12 +133,30 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
   void initState() {
     super.initState();
     _listenForNotifications();
+    _checkInitialAuth();
+  }
+
+  void _checkInitialAuth() async {
+    final authService = DjangoAuthService();
+    if (authService.isLoggedIn) {
+      final username = authService.currentUser?.username;
+      if (username != null) {
+        MqttService().connect(username);
+      }
+    }
   }
 
   void _listenForNotifications() {
     NotificationService().notifications.listen((data) {
-      if (data['type'] == 'call_invitation') {
-        _showIncomingCallDialog(data['data']);
+      if (!mounted) return;
+      
+      final type = data['type'];
+      final payload = data['data'] ?? data['payload'];
+
+      if (type == 'call_invitation') {
+        _showIncomingCallDialog(payload);
+      } else if (type == 'game_invitation') {
+        _showGameInvitationDialog(payload);
       }
     });
   }
@@ -214,6 +238,36 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             child: const Text('Accept'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showGameInvitationDialog(Map<String, dynamic> invData) {
+    if (!mounted) return;
+
+    final sender = invData['sender']['username'];
+    final roomId = invData['room_id'];
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Game Challenge'),
+        content: Text('$sender has challenged you to a game!'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Ignore'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              // Navigate to invitations screen or directly to game
+              context.push('/invitations');
+            },
+            child: const Text('View'),
           ),
         ],
       ),

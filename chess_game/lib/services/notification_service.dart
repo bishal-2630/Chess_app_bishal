@@ -15,6 +15,9 @@ class NotificationService {
   WebSocketChannel? _channel;
   final StreamController<Map<String, dynamic>> _notificationController = 
       StreamController<Map<String, dynamic>>.broadcast();
+  
+  // Track last received notification to avoid duplicates if necessary
+  String? _lastNotificationId;
 
   Stream<Map<String, dynamic>> get notifications => _notificationController.stream;
 
@@ -80,5 +83,17 @@ class NotificationService {
   void clearNotifications() {
     // Clear any pending notifications
     _notificationController.add({'type': 'clear'});
+  }
+
+  /// Handles notifications from external sources like MQTT
+  void handleExternalNotification(Map<String, dynamic> data) {
+    try {
+      print('🔔 Handling external notification: ${data['type']}');
+      
+      // Prevent duplicate processing if possible (can be expanded with unique IDs)
+      _notificationController.add(data);
+    } catch (e) {
+      print('🔔 Error handling external notification: $e');
+    }
   }
 }

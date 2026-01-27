@@ -263,23 +263,21 @@ class UserCard extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.call),
                   color: Colors.green,
-                  onPressed: isOnline 
-                      ? () {
-                          // Generate a room ID for the call
-                          final roomId = 'call_${DateTime.now().millisecondsSinceEpoch}';
-                          // Navigate to call screen as Caller
-                          context.push(
-                            '/call?roomId=$roomId&otherUserName=${user['username']}&isCaller=true'
-                          );
-                        }
-                      : null,
+                  onPressed: () {
+                    // Generate a room ID for the call
+                    final roomId = 'call_${DateTime.now().millisecondsSinceEpoch}';
+                    // Navigate to call screen as Caller
+                    context.push(
+                      '/call?roomId=$roomId&otherUserName=${user['username']}&isCaller=true'
+                    );
+                  },
                   tooltip: 'Call',
                 ),
                 // Challenge Button 
                 IconButton(
                   icon: const Icon(Icons.play_arrow),
                   color: Colors.blue,
-                  onPressed: isOnline ? onInvite : null,
+                  onPressed: onInvite,
                   tooltip: 'Challenge',
                 ),
               ],

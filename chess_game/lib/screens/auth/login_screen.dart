@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/django_auth_service.dart';
+import '../../services/mqtt_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -34,6 +35,10 @@ class _LoginScreenState extends State<LoginScreen> {
           _showSuccessSnackBar('Login successful!');
           // Navigate to home screen
           if (context.mounted) {
+            final user = _authService.currentUser;
+            if (user != null) {
+              MqttService().connect(user.username);
+            }
             context.go('/chess');
           }
         } else {
@@ -88,6 +93,10 @@ class _LoginScreenState extends State<LoginScreen> {
       if (result['success'] == true) {
         _showSuccessSnackBar('Google sign-in successful!');
         if (context.mounted) {
+          final user = _authService.currentUser;
+          if (user != null) {
+            MqttService().connect(user.username);
+          }
           context.go('/chess');
         }
       } else {
@@ -134,6 +143,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 await _authService.loginAsGuest(name);
                 Navigator.pop(context);
                 if (context.mounted) {
+                  final user = _authService.currentUser;
+                  if (user != null) {
+                    MqttService().connect(user.username);
+                  }
                   context.go('/chess');
                 }
               }
