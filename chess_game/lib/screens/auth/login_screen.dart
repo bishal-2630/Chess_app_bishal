@@ -36,8 +36,9 @@ class _LoginScreenState extends State<LoginScreen> {
           // Navigate to home screen
           if (context.mounted) {
             final user = _authService.currentUser;
-            if (user != null) {
-              MqttService().connect(user.username);
+            final username = user?['username'] ?? _authService.guestName;
+            if (username != null) {
+              MqttService().connect(username);
             }
             context.go('/chess');
           }
@@ -94,8 +95,9 @@ class _LoginScreenState extends State<LoginScreen> {
         _showSuccessSnackBar('Google sign-in successful!');
         if (context.mounted) {
           final user = _authService.currentUser;
-          if (user != null) {
-            MqttService().connect(user.username);
+          final username = user?['username'] ?? _authService.guestName;
+          if (username != null) {
+            MqttService().connect(username);
           }
           context.go('/chess');
         }
@@ -144,8 +146,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 Navigator.pop(context);
                 if (context.mounted) {
                   final user = _authService.currentUser;
-                  if (user != null) {
-                    MqttService().connect(user.username);
+                  final username = user?['username'] ?? _authService.guestName;
+                  if (username != null) {
+                    MqttService().connect(username);
                   }
                   context.go('/chess');
                 }
