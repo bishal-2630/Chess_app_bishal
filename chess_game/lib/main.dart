@@ -141,6 +141,8 @@ class IncomingCallWrapper extends StatefulWidget {
 }
 
 class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
+  bool _isDialogShowing = false;
+
   @override
   void initState() {
     super.initState();
