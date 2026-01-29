@@ -150,11 +150,15 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
 
   void _checkInitialAuth() async {
     final authService = DjangoAuthService();
+    print('🔍 Checking initial auth. isLoggedIn: ${authService.isLoggedIn}');
     if (authService.isLoggedIn) {
       final username =
           authService.currentUser?['username'] ?? authService.guestName;
+      print('🔍 Username: $username');
       if (username != null) {
-        MqttService().connect(username);
+        print('🔌 Attempting to connect MQTT for user: $username');
+        await MqttService().connect(username);
+        print('🔌 MQTT connect call completed');
       }
     }
   }

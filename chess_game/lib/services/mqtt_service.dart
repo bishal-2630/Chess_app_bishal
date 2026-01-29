@@ -37,9 +37,14 @@ class MqttService {
   }
 
   Future<void> connect(String username) async {
-    if (isConnected) return;
+    print('🔌 MQTT: connect() called for username: $username');
+    if (isConnected) {
+      print('⚠️ MQTT: Already connected, skipping');
+      return;
+    }
 
     final clientIdentifier = 'flutter_client_${username}_${DateTime.now().millisecondsSinceEpoch}';
+    print('🔌 MQTT: Creating client with ID: $clientIdentifier');
     client = MqttServerClient(broker, clientIdentifier);
     client!.port = port;
     client!.keepAlivePeriod = 20;
@@ -56,10 +61,11 @@ class MqttService {
     client!.connectionMessage = connMess;
 
     try {
-      print('MQTT: Connecting...');
+      print('🔌 MQTT: Attempting connection to $broker:$port...');
       await client!.connect();
+      print('🔌 MQTT: Connection attempt completed');
     } on Exception catch (e) {
-      print('MQTT: Connection failed - $e');
+      print('❌ MQTT: Connection failed - $e');
       disconnect();
       return;
     }
@@ -70,7 +76,7 @@ class MqttService {
       _subscribeToNotifications(username);
       _listen();
     } else {
-      print('MQTT: Connection failed - state is ${client!.connectionStatus!.state}');
+      print('❌ MQTT: Connection failed - state is ${client!.connectionStatus!.state}');
       disconnect();
     }
   }
