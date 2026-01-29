@@ -131,12 +131,16 @@ class MqttService {
       showWhen: true,
       fullScreenIntent: true,
       category: AndroidNotificationCategory.call,
+      visibility: NotificationVisibility.public,
     );
     const NotificationDetails platformChannelSpecifics =
         NotificationDetails(android: androidPlatformChannelSpecifics);
     
+    // Use a unique ID based on timestamp to avoid overwriting previous notifications
+    final int notificationId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
+
     await flutterLocalNotificationsPlugin.show(
-      0,
+      notificationId,
       title,
       body,
       platformChannelSpecifics,

@@ -12,6 +12,7 @@ import 'services/django_auth_service.dart';
 import 'services/notification_service.dart';
 import 'services/mqtt_service.dart';
 import 'services/game_service.dart';
+import 'services/background_service.dart';
 import 'dart:async';
 
 void main() async {
@@ -22,6 +23,9 @@ void main() async {
   // Initialize MQTT Service (sets up local notifications)
   final mqttService = MqttService();
   await mqttService.initialize();
+
+  // Initialize background service to keep MQTT alive when app is closed
+  await BackgroundServiceInstance.initializeService();
 
   runApp(MyApp());
 }

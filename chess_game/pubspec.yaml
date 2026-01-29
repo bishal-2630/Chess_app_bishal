@@ -22,6 +22,8 @@ dependencies:
   mqtt_client: ^10.3.0
   shared_preferences: ^2.2.2
   flutter_local_notifications: ^17.2.2
+  flutter_background_service: ^5.0.10
+  device_info_plus: ^10.1.0
 
 dev_dependencies:
   flutter_test:
