@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../services/mqtt_service.dart';
 import '../../services/game_service.dart';
 import '../../services/django_auth_service.dart';
 import 'dart:async';
@@ -39,12 +40,12 @@ class _UserListScreenState extends State<UserListScreen> {
     });
 
     try {
-        final result = await GameService.getAllUsers();
-        if (result['success']) {
-          setState(() {
-            _allUsers = result['users'];
-          });
-        }
+      final result = await GameService.getAllUsers();
+      if (result['success']) {
+        setState(() {
+          _allUsers = result['users'];
+        });
+      }
     } catch (e) {
       print('Error loading users: $e');
     } finally {
@@ -67,7 +68,7 @@ class _UserListScreenState extends State<UserListScreen> {
     if (_searchQuery.isEmpty) {
       return users;
     }
-    
+
     return users.where((user) {
       final username = user['username']?.toString().toLowerCase() ?? '';
       final query = _searchQuery.toLowerCase();
@@ -77,7 +78,7 @@ class _UserListScreenState extends State<UserListScreen> {
 
   Future<void> _sendInvitation(dynamic user) async {
     final roomId = 'room_${DateTime.now().millisecondsSinceEpoch}';
-    
+
     setState(() {
       _sentChallenges[user['username']] = DateTime.now();
     });
@@ -145,7 +146,7 @@ class _UserListScreenState extends State<UserListScreen> {
               },
             ),
           ),
-          
+
           // User list
           Expanded(
             child: _isLoading
@@ -189,12 +190,16 @@ class _UserListScreenState extends State<UserListScreen> {
                             final lastSent = _sentChallenges[user['username']];
                             bool isRecent = false;
                             if (lastSent != null) {
-                              isRecent = DateTime.now().difference(lastSent).inMinutes < 1;
+                              isRecent = DateTime.now()
+                                      .difference(lastSent)
+                                      .inMinutes <
+                                  1;
                             }
-                            
+
                             return UserCard(
                               user: user,
-                              onInvite: isRecent ? null : () => _sendInvitation(user),
+                              onInvite:
+                                  isRecent ? null : () => _sendInvitation(user),
                               isOnline: user['is_online'] ?? false,
                               isRecent: isRecent,
                             );
@@ -245,9 +250,9 @@ class UserCard extends StatelessWidget {
                     )
                   : null,
             ),
-            
+
             const SizedBox(width: 16),
-            
+
             // User info
             Expanded(
               child: Column(
@@ -284,7 +289,7 @@ class UserCard extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             // Invite button
             // Actions
             Row(
@@ -296,18 +301,19 @@ class UserCard extends StatelessWidget {
                   color: Colors.green,
                   onPressed: () {
                     // Generate a room ID for the call
-                    final roomId = 'call_${DateTime.now().millisecondsSinceEpoch}';
+                    final roomId =
+                        'call_${DateTime.now().millisecondsSinceEpoch}';
                     MqttService().playSound('sounds/call_ringtone.mp3');
                     // Navigate to call screen as Caller
                     context.push(
-                      '/call?roomId=$roomId&otherUserName=${user['username']}&isCaller=true'
-                    );
+                        '/call?roomId=$roomId&otherUserName=${user['username']}&isCaller=true');
                   },
                   tooltip: 'Call',
                 ),
-                // Challenge Button 
+                // Challenge Button
                 IconButton(
-                  icon: Icon(isRecent ? Icons.hourglass_empty : Icons.play_arrow),
+                  icon:
+                      Icon(isRecent ? Icons.hourglass_empty : Icons.play_arrow),
                   color: isRecent ? Colors.grey : Colors.blue,
                   onPressed: onInvite,
                   tooltip: isRecent ? 'Sent (Expires in 1m)' : 'Challenge',
