@@ -169,9 +169,24 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
 
       final type = data['type'];
       final payload = data['data'] ?? data['payload'];
+      final action = data['action']; // Check if this came from a notification action
 
       if (type == 'call_invitation') {
-        _showIncomingCallDialog(payload);
+        // If user tapped Accept on notification, go directly to call screen
+        if (action == 'accept') {
+          final caller = payload['caller'];
+          final roomId = payload['room_id'];
+          print('📞 Auto-accepting call from notification');
+          try {
+            GoRouter.of(context).push(
+                '/call?roomId=$roomId&otherUserName=$caller&isCaller=false');
+          } catch (e) {
+            print("Navigation failed: $e");
+          }
+        } else {
+          // Show dialog for normal MQTT notification
+          _showIncomingCallDialog(payload);
+        }
       } else if (type == 'game_invitation') {
         _showGameInvitationDialog(payload);
       } else if (type == 'invitation_response') {

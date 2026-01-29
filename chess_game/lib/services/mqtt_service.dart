@@ -42,11 +42,31 @@ class MqttService {
   }
 
   void _onNotificationTapped(NotificationResponse response) {
-    print('🔔 Notification tapped: ${response.payload}');
+    print('🔔 Notification tapped: ${response.actionId}');
+    print('🔔 Payload: ${response.payload}');
+    
     if (response.payload != null) {
       try {
         final data = json.decode(response.payload!);
-        // Broadcast the notification data so the app can handle it
+        
+        // Handle action button taps
+        if (response.actionId == 'decline') {
+          print('❌ User declined call from notification');
+          cancelCallNotification();
+          return;
+        } else if (response.actionId == 'accept') {
+          print('✅ User accepted call from notification');
+          cancelCallNotification();
+          // Broadcast to open call screen
+          _notificationController.add({
+            ...data,
+            'action': 'accept',
+          });
+          return;
+        }
+        
+        // Handle regular notification tap (no action button)
+        print('👆 User tapped notification body');
         _notificationController.add(data);
       } catch (e) {
         print('Error parsing notification payload: $e');
@@ -201,11 +221,29 @@ class MqttService {
   }
 
   Future<void> _showCallNotification(String caller, String roomId, String payload) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-      'chess_call_notifications',
-      'Chess Calls',
-      channelDescription: 'Incoming call notifications',
+    print('📱 Creating call notification for $caller');
+    
+    // Create notification channel for calls if it doesn't exist
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      'chess_incoming_calls',
+      'Incoming Calls',
+      description: 'Notifications for incoming calls',
+      importance: Importance.max,
+      playSound: false, // We're playing our own ringtone
+      enableVibration: true,
+      showBadge: true,
+    );
+
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+
+    // Create notification with action buttons
+    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      channel.id,
+      channel.name,
+      channelDescription: channel.description,
       importance: Importance.max,
       priority: Priority.high,
       showWhen: true,
@@ -214,10 +252,27 @@ class MqttService {
       visibility: NotificationVisibility.public,
       ongoing: true,
       autoCancel: false,
+      playSound: false,
+      enableVibration: true,
+      actions: <AndroidNotificationAction>[
+        const AndroidNotificationAction(
+          'decline',
+          'Decline',
+          showsUserInterface: false,
+          cancelNotification: true,
+        ),
+        const AndroidNotificationAction(
+          'accept',
+          'Accept',
+          showsUserInterface: true,
+          cancelNotification: true,
+        ),
+      ],
     );
-    const NotificationDetails platformChannelSpecifics =
-        NotificationDetails(android: androidPlatformChannelSpecifics);
-    
+
+    final NotificationDetails notificationDetails =
+        NotificationDetails(android: androidDetails);
+
     // Use a fixed ID for call notifications so we can cancel it later
     const int callNotificationId = 999;
 
@@ -225,9 +280,11 @@ class MqttService {
       callNotificationId,
       'Incoming Call',
       '$caller is calling you...',
-      platformChannelSpecifics,
+      notificationDetails,
       payload: payload,
     );
+    
+    print('✅ Call notification shown for $caller');
   }
 
   Future<void> cancelCallNotification() async {
