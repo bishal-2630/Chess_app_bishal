@@ -25,7 +25,8 @@ void main() async {
   await mqttService.initialize();
 
   // Initialize background service to keep MQTT alive when app is closed
-  await BackgroundServiceInstance.initializeService();
+  // Temporarily disabled for testing
+  // await BackgroundServiceInstance.initializeService();
 
   runApp(MyApp());
 }

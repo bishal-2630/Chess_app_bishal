@@ -66,7 +66,7 @@ class MqttService {
 
     if (client!.connectionStatus!.state == MqttConnectionState.connected) {
       isConnected = true;
-      print('MQTT: Connected');
+      print('✅ MQTT: Connected successfully');
       _subscribeToNotifications(username);
       _listen();
     } else {
@@ -98,16 +98,21 @@ class MqttService {
   }
 
   void _handleNotification(Map<String, dynamic> data) {
+    print('🔔 MQTT: _handleNotification called with data: $data');
     final type = data['type'];
     final payload = data['payload'];
 
+    print('🔔 MQTT: Notification type: $type');
+
     if (type == 'game_invitation') {
+      print('🔔 MQTT: Showing game invitation notification');
       _showLocalNotification(
         'New Challenge!',
         '${payload['sender']['username']} has challenged you to a game.',
         json.encode(data),
       );
     } else if (type == 'call_invitation') {
+      print('🔔 MQTT: Showing call invitation notification');
       playSound('sounds/ringtone.mp3');
       _showLocalNotification(
         'Incoming Call',
@@ -116,6 +121,7 @@ class MqttService {
       );
     }
     
+    print('🔔 MQTT: Broadcasting to stream listeners');
     // Broadcast to internal listeners
     _notificationController.add(data);
   }
