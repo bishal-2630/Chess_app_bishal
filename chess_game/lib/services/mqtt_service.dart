@@ -92,8 +92,10 @@ class MqttService {
 
   void _subscribeToNotifications(String username) {
     final topic = 'chess/user/$username/notifications';
-    print('MQTT: Subscribing to $topic');
+    print('📬 MQTT: Subscribing to topic: $topic');
+    print('📬 MQTT: Username for subscription: $username');
     client!.subscribe(topic, MqttQos.atLeastOnce);
+    print('📬 MQTT: Subscribe request sent for $topic');
   }
 
   void _listen() {
@@ -106,15 +108,19 @@ class MqttService {
     print('👂 MQTT: Setting up message listener');
     client!.updates!.listen((List<MqttReceivedMessage<MqttMessage?>>? c) {
       final MqttPublishMessage recMess = c![0].payload as MqttPublishMessage;
+      final String topic = c[0].topic;
       final String pt =
           MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
 
-      print('MQTT: Notification received: $pt');
+      print('📨 MQTT: Message received on topic: $topic');
+      print('📨 MQTT: Raw message payload: $pt');
       try {
         final data = json.decode(pt);
+        print('📨 MQTT: Parsed message type: ${data['type']}');
         _handleNotification(data);
       } catch (e) {
-        print('MQTT: Error parsing message: $e');
+        print('❌ MQTT: Error parsing message: $e');
+        print('❌ MQTT: Failed payload was: $pt');
       }
     });
   }
@@ -191,7 +197,8 @@ class MqttService {
   }
 
   void onSubscribed(String topic) {
-    print('MQTT: OnSubscribed to topic $topic');
+    print('✅ MQTT: Successfully subscribed to topic: $topic');
+    print('✅ MQTT: Now listening for messages on: $topic');
   }
 
   Future<void> playSound(String fileName) async {

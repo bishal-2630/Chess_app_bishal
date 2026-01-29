@@ -220,6 +220,9 @@ class GameService {
     required String roomId,
   }) async {
     try {
+      print('📞 CALL SIGNAL: Sending to receiver: $receiverUsername');
+      print('📞 CALL SIGNAL: Room ID: $roomId');
+      
       final response = await http.post(
         Uri.parse('${_baseUrl}call/send/'),
         headers: await _getAuthHeaders(),
@@ -229,12 +232,18 @@ class GameService {
         }),
       );
 
+      print('📞 CALL SIGNAL: Response status: ${response.statusCode}');
+      print('📞 CALL SIGNAL: Response body: ${response.body}');
+
       if (response.statusCode == 200) {
+        print('✅ CALL SIGNAL: Successfully sent to $receiverUsername');
         return {'success': true};
       } else {
+        print('❌ CALL SIGNAL: Failed with status ${response.statusCode}');
         return {'success': false, 'error': 'Failed to send call signal'};
       }
     } catch (e) {
+      print('❌ CALL SIGNAL: Exception - ${e.toString()}');
       return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }
