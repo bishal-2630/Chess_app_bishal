@@ -2,11 +2,12 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/config.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../services/notification_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/mqtt_service.dart';
 
 class DjangoAuthService {
   // Singleton pattern
@@ -23,16 +24,6 @@ class DjangoAuthService {
     serverClientId:
         '764791811000-uhnrqvpfe4euoaff3kmiekrc7p7c4obk.apps.googleusercontent.com',
   );
-  Future<void> initialize() async {
-    final prefs = await SharedPreferences.getInstance();
-    _accessToken = prefs.getString(_tokenKey);
-    _refreshToken = prefs.getString(_refreshKey);
-    final userData = prefs.getString(_userKey);
-    if (userData != null) {
-      _currentUser = json.decode(userData);
-      NotificationService().connect();
-    }
-  }
 
   // User data storage
   Map<String, dynamic>? _currentUser;
@@ -47,6 +38,32 @@ class DjangoAuthService {
   bool get isGuest => _isGuest;
   String? get guestName => _guestName;
   String? get accessToken => _accessToken;
+
+  Future<void> initialize() async {
+    final prefs = await SharedPreferences.getInstance();
+    _accessToken = prefs.getString(_tokenKey);
+    _refreshToken = prefs.getString(_refreshKey);
+
+    final userData = prefs.getString(_userKey);
+    if (userData != null) {
+      _currentUser = json.decode(userData);
+      print('💾 Loaded saved user: ${_currentUser?['email']}');
+
+      // Auto-connect MQTT if we have a session
+      if (_currentUser?['username'] != null) {
+        MqttService().connect(_currentUser!['username']);
+      }
+    }
+  }
+
+  Future<void> _saveAuthData() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_accessToken != null) await prefs.setString(_tokenKey, _accessToken!);
+    if (_refreshToken != null)
+      await prefs.setString(_refreshKey, _refreshToken!);
+    if (_currentUser != null)
+      await prefs.setString(_userKey, json.encode(_currentUser));
+  }
 
   String get _baseUrl {
     return AppConfig.baseUrl;
@@ -105,20 +122,7 @@ class DjangoAuthService {
             _refreshToken = responseData['tokens']['refresh'];
           }
 
-          // Connect to Notification Service to show user online
-          NotificationService().connect();
-
-          // Save tokens and user data to SharedPreferences
-          final prefs = await SharedPreferences.getInstance();
-          if (_accessToken != null) {
-            await prefs.setString(_tokenKey, _accessToken!);
-          }
-          if (_refreshToken != null) {
-            await prefs.setString(_refreshKey, _refreshToken!);
-          }
-          if (_currentUser != null) {
-            await prefs.setString(_userKey, json.encode(_currentUser));
-          }
+          await _saveAuthData();
 
           return {
             'success': true,
@@ -202,6 +206,8 @@ class DjangoAuthService {
         // Store user data
         _currentUser = responseData['user'];
 
+        await _saveAuthData();
+
         // Handle cookies for web view
         String? rawCookie = response.headers['set-cookie'];
         if (rawCookie != null) {
@@ -210,13 +216,6 @@ class DjangoAuthService {
         }
 
         print('✅ Django registration successful: ${_currentUser?['email']}');
-
-        // Connect to Notification Service to show user online
-        NotificationService().connect();
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_tokenKey, _accessToken!);
-        await prefs.setString(_refreshKey, _refreshToken!);
-        await prefs.setString(_userKey, json.encode(_currentUser));
 
         return {'success': true, 'user': _currentUser, 'tokens': responseData};
       } else {
@@ -296,6 +295,8 @@ class DjangoAuthService {
           _refreshToken = responseData['tokens']['refresh'];
         }
 
+        await _saveAuthData();
+
         // Handle cookies for web view
         String? rawCookie = response.headers['set-cookie'];
         if (rawCookie != null) {
@@ -304,13 +305,6 @@ class DjangoAuthService {
         }
 
         print('✅ Google sign in successful: ${_currentUser?['email']}');
-
-        // Connect to Notification Service to show user online
-        NotificationService().connect();
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_tokenKey, _accessToken!);
-        await prefs.setString(_refreshKey, _refreshToken!);
-        await prefs.setString(_userKey, json.encode(_currentUser));
 
         return {'success': true, 'user': _currentUser, 'tokens': responseData};
       } else {
@@ -481,8 +475,8 @@ class DjangoAuthService {
       _accessToken = null;
       _refreshToken = null;
 
-      // Disconnect Notification Service (User goes offline)
-      NotificationService().disconnect();
+      // Disconnect MQTT (User goes offline)
+      MqttService().disconnect();
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_tokenKey);
       await prefs.remove(_refreshKey);

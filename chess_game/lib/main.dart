@@ -150,14 +150,12 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
           authService.currentUser?['username'] ?? authService.guestName;
       if (username != null) {
         MqttService().connect(username);
-        // Also connect NotificationService for real-time WebSocket signals
-        NotificationService().connect();
       }
     }
   }
 
   void _listenForNotifications() {
-    NotificationService().notifications.listen((data) {
+    MqttService().notifications.listen((data) {
       if (!mounted) return;
 
       final type = data['type'];

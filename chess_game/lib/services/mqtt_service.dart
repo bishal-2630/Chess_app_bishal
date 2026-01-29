@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
-import './notification_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:audioplayers/audioplayers.dart';
 
@@ -14,6 +14,10 @@ class MqttService {
   final String broker = 'broker.emqx.io';
   final int port = 1883;
   bool isConnected = false;
+
+  final StreamController<Map<String, dynamic>> _notificationController = 
+      StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get notifications => _notificationController.stream;
 
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
@@ -112,8 +116,8 @@ class MqttService {
       );
     }
     
-    // Also notify internal notification service
-    NotificationService().handleExternalNotification(data);
+    // Broadcast to internal listeners
+    _notificationController.add(data);
   }
 
   Future<void> _showLocalNotification(String title, String body, String payload) async {
