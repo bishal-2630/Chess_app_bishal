@@ -238,7 +238,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
         actions: [
           TextButton(
             onPressed: () {
-              MqttService().stopAudio();
+              MqttService().cancelCallNotification();
               Navigator.of(dialogContext).pop();
               // Decline logic here if needed (send signal)
             },
@@ -246,45 +246,13 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
           ),
           ElevatedButton(
             onPressed: () {
-              MqttService().stopAudio();
+              MqttService().cancelCallNotification();
               Navigator.of(dialogContext).pop();
               // Navigate to call screen as Callee (isCaller=false)
-              // We need to use GoRouter to push.
-              // Since the context here is valid, we can try GoRouter.of(context).
-              // However, GoRouter might not be found if IncomingCallWrapper is
-              // strictly between MaterialApp and Router?
-              // Actually MaterialApp.router uses the router as the navigator.
-              // builder wraps the navigator. So child IS the navigator (or router output).
-              // So context below IncomingCallWrapper has the Router?
-              // IncomingCallWrapper's context might NOT have the Router if it's a parent of it.
-              // BUT, GoRouter is passed to MaterialApp.routerConfig.
-              // The `child` passed to builder IS the Widget built by the router.
-              // So GoRouter IS in the tree?
-              // Wait. `MaterialApp.router` uses `routerConfig`.
-              // The `builder` wraps the `child` which is the result of `router`.
-              // So `GoRouter.of(context)` should work? NO, because `IncomingCallWrapper`
-              // is PARENT of the router outlet?
-              // Actually, `builder` in `MaterialApp` wraps the `Navigator` created by the `RouterDelegate`.
-              // So `IncomingCallWrapper` is PARENT of `Navigator`.
-              // So `GoRouter` (which relies on `InheritedWidget` inside logic) might be accessible
-              // if it places itself above the builder?
-              // Usually `GoRouter` injects itself.
-
-              // Safest bet: Use the router object directly if accessible or try context.go.
-              // Since `router` is local in `build`, we can't access it here.
-              // But we can use `GoRouter.of(context)` might fail.
-
-              // ALTERNATIVE: Use a GlobalKey for the GoRouter navigator?
-              // Or just try `context.push`. If it fails, we know why.
-
               try {
                 GoRouter.of(context).push(
                     '/call?roomId=$roomId&otherUserName=$caller&isCaller=false');
               } catch (e) {
-                // If GoRouter lookup fails, try Navigator?
-                // Getting navigator from this context might fail if we are above it.
-                // Actually `child` IS the navigator.
-                // So we can't easily navigate FROM `IncomingCallWrapper` context without a key.
                 print("Navigation failed: $e");
               }
             },
@@ -325,7 +293,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
             TextButton(
               onPressed: () {
                 expiryTimer?.cancel();
-                MqttService().stopAudio();
+                MqttService().cancelCallNotification();
                 Navigator.of(dialogContext).pop();
                 _declineInvitation(invitationId);
               },
@@ -334,7 +302,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
             ElevatedButton(
               onPressed: () {
                 expiryTimer?.cancel();
-                MqttService().stopAudio();
+                MqttService().cancelCallNotification();
                 Navigator.of(dialogContext).pop();
                 // Directly Accept
                 GameService.respondToInvitation(

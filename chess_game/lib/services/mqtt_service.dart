@@ -22,6 +22,7 @@ class MqttService {
 
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
+  String? _currentCallRoomId;
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -34,7 +35,23 @@ class MqttService {
       android: initializationSettingsAndroid,
     );
     
-    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+    await flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: _onNotificationTapped,
+    );
+  }
+
+  void _onNotificationTapped(NotificationResponse response) {
+    print('🔔 Notification tapped: ${response.payload}');
+    if (response.payload != null) {
+      try {
+        final data = json.decode(response.payload!);
+        // Broadcast the notification data so the app can handle it
+        _notificationController.add(data);
+      } catch (e) {
+        print('Error parsing notification payload: $e');
+      }
+    }
   }
 
   String? _currentUsername;
@@ -141,10 +158,11 @@ class MqttService {
       );
     } else if (type == 'call_invitation') {
       print('🔔 MQTT: Showing call invitation notification');
+      _currentCallRoomId = payload['room_id'];
       playSound('sounds/ringtone.mp3');
-      _showLocalNotification(
-        'Incoming Call',
-        '${payload['caller']} is calling you...',
+      _showCallNotification(
+        '${payload['caller']}',
+        payload['room_id'],
         json.encode(data),
       );
     }
@@ -180,6 +198,42 @@ class MqttService {
       platformChannelSpecifics,
       payload: payload,
     );
+  }
+
+  Future<void> _showCallNotification(String caller, String roomId, String payload) async {
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'chess_call_notifications',
+      'Chess Calls',
+      channelDescription: 'Incoming call notifications',
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: true,
+      fullScreenIntent: true,
+      category: AndroidNotificationCategory.call,
+      visibility: NotificationVisibility.public,
+      ongoing: true,
+      autoCancel: false,
+    );
+    const NotificationDetails platformChannelSpecifics =
+        NotificationDetails(android: androidPlatformChannelSpecifics);
+    
+    // Use a fixed ID for call notifications so we can cancel it later
+    const int callNotificationId = 999;
+
+    await flutterLocalNotificationsPlugin.show(
+      callNotificationId,
+      'Incoming Call',
+      '$caller is calling you...',
+      platformChannelSpecifics,
+      payload: payload,
+    );
+  }
+
+  Future<void> cancelCallNotification() async {
+    const int callNotificationId = 999;
+    await flutterLocalNotificationsPlugin.cancel(callNotificationId);
+    await stopAudio();
   }
 
   void onConnected() {

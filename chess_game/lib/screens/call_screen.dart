@@ -35,8 +35,8 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void initState() {
     super.initState();
-    // Stop any incoming ringtone from MqttService
-    MqttService().stopAudio();
+    // Stop any incoming ringtone from MqttService and cancel notification
+    MqttService().cancelCallNotification();
     _initRenderers();
     _connect();
   }
