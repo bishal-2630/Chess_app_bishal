@@ -144,6 +144,8 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
       final username = authService.currentUser?['username'] ?? authService.guestName;
       if (username != null) {
         MqttService().connect(username);
+        // Also connect NotificationService for real-time WebSocket signals
+        NotificationService().connect();
       }
     }
   }
@@ -159,8 +161,28 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
         _showIncomingCallDialog(payload);
       } else if (type == 'game_invitation') {
         _showGameInvitationDialog(payload);
+      } else if (type == 'invitation_response') {
+        _handleInvitationResponse(payload);
       }
     });
+  }
+
+  void _handleInvitationResponse(Map<String, dynamic> data) {
+    final action = data['action'];
+    final invitation = data['invitation'];
+    final receiver = invitation['receiver']['username'];
+    final roomId = invitation['room_id'];
+
+    if (action == 'accept' && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$receiver accepted your challenge! Joining game...'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      // Navigate to the room as White (since we sent the challenge)
+      context.go('/chess?roomId=$roomId&color=w');
+    }
   }
 
   Future<void> _declineInvitation(int invitationId) async {

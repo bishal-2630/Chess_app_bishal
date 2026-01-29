@@ -78,8 +78,9 @@ class SignalingService {
          if (onConnectionState != null) onConnectionState!(false);
       });
       
-      // Notify UI that we are attempting/connected
-      if (onConnectionState != null) onConnectionState!(true);
+      // Note: We'll wait for the first message or a successful handshake if possible, 
+      // but for now, we'll let the stream listener handle disconnects.
+      // Removed premature onConnectionState(true) call here.
       
     } catch (e) {
       print('Connection failed: $e');
