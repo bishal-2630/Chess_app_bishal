@@ -16,11 +16,13 @@ import 'dart:async';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  await DjangoAuthService().initialize();
+
   // Initialize MQTT Service (sets up local notifications)
   final mqttService = MqttService();
   await mqttService.initialize();
-  
+
   runApp(MyApp());
 }
 
@@ -29,9 +31,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
+    final authService = DjangoAuthService();
     final GoRouter router = GoRouter(
-      initialLocation: '/login',
+      initialLocation: authService.isLoggedIn ? '/chess' : '/login',
       routes: [
         ShellRoute(
           builder: (context, state, child) {
@@ -65,13 +67,17 @@ class MyApp extends StatelessWidget {
             GoRoute(
               path: '/call',
               builder: (context, state) {
-                final roomId = state.uri.queryParameters['roomId'] ?? 'testroom';
-                final otherUserName = state.uri.queryParameters['otherUserName'] ?? 
-                                      state.uri.queryParameters['callerName'] ?? 'Unknown';
-                final isCaller = state.uri.queryParameters['isCaller'] == 'true';
-                
+                final roomId =
+                    state.uri.queryParameters['roomId'] ?? 'testroom';
+                final otherUserName =
+                    state.uri.queryParameters['otherUserName'] ??
+                        state.uri.queryParameters['callerName'] ??
+                        'Unknown';
+                final isCaller =
+                    state.uri.queryParameters['isCaller'] == 'true';
+
                 return CallScreen(
-                  roomId: roomId, 
+                  roomId: roomId,
                   otherUserName: otherUserName,
                   isCaller: isCaller,
                 );
@@ -105,7 +111,6 @@ class MyApp extends StatelessWidget {
         if (isLoggedIn && isAuthPage) {
           return '/chess';
         }
-
         return null;
       },
     );
@@ -141,7 +146,8 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
   void _checkInitialAuth() async {
     final authService = DjangoAuthService();
     if (authService.isLoggedIn) {
-      final username = authService.currentUser?['username'] ?? authService.guestName;
+      final username =
+          authService.currentUser?['username'] ?? authService.guestName;
       if (username != null) {
         MqttService().connect(username);
         // Also connect NotificationService for real-time WebSocket signals
@@ -153,7 +159,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
   void _listenForNotifications() {
     NotificationService().notifications.listen((data) {
       if (!mounted) return;
-      
+
       final type = data['type'];
       final payload = data['data'] ?? data['payload'];
 
@@ -198,16 +204,17 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
 
   void _showIncomingCallDialog(Map<String, dynamic> callData) {
     if (!mounted) return;
-    
+
     final caller = callData['caller'];
     final roomId = callData['room_id'];
-    
+
     showDialog(
-      context: context, // This context works because it's inside MaterialApp builder? 
-                        // Actually, this context is ABOVE the Navigator if wrapping child.
-                        // We need a context that has a Material ancestor? 
-                        // MaterialApp -> builder -> IncomingCallWrapper -> child(Navigator).
-                        // So IncomingCallWrapper is inside MaterialApp. It should work.
+      context:
+          context, // This context works because it's inside MaterialApp builder?
+      // Actually, this context is ABOVE the Navigator if wrapping child.
+      // We need a context that has a Material ancestor?
+      // MaterialApp -> builder -> IncomingCallWrapper -> child(Navigator).
+      // So IncomingCallWrapper is inside MaterialApp. It should work.
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Incoming Call'),
@@ -224,9 +231,9 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
         actions: [
           TextButton(
             onPressed: () {
-               MqttService().stopAudio();
-               Navigator.of(dialogContext).pop();
-               // Decline logic here if needed (send signal)
+              MqttService().stopAudio();
+              Navigator.of(dialogContext).pop();
+              // Decline logic here if needed (send signal)
             },
             child: const Text('Decline', style: TextStyle(color: Colors.red)),
           ),
@@ -237,36 +244,37 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
               // Navigate to call screen as Callee (isCaller=false)
               // We need to use GoRouter to push.
               // Since the context here is valid, we can try GoRouter.of(context).
-              // However, GoRouter might not be found if IncomingCallWrapper is 
-              // strictly between MaterialApp and Router? 
+              // However, GoRouter might not be found if IncomingCallWrapper is
+              // strictly between MaterialApp and Router?
               // Actually MaterialApp.router uses the router as the navigator.
               // builder wraps the navigator. So child IS the navigator (or router output).
-              // So context below IncomingCallWrapper has the Router? 
+              // So context below IncomingCallWrapper has the Router?
               // IncomingCallWrapper's context might NOT have the Router if it's a parent of it.
               // BUT, GoRouter is passed to MaterialApp.routerConfig.
               // The `child` passed to builder IS the Widget built by the router.
-              // So GoRouter IS in the tree? 
+              // So GoRouter IS in the tree?
               // Wait. `MaterialApp.router` uses `routerConfig`.
               // The `builder` wraps the `child` which is the result of `router`.
-              // So `GoRouter.of(context)` should work? NO, because `IncomingCallWrapper` 
+              // So `GoRouter.of(context)` should work? NO, because `IncomingCallWrapper`
               // is PARENT of the router outlet?
               // Actually, `builder` in `MaterialApp` wraps the `Navigator` created by the `RouterDelegate`.
               // So `IncomingCallWrapper` is PARENT of `Navigator`.
-              // So `GoRouter` (which relies on `InheritedWidget` inside logic) might be accessible 
-              // if it places itself above the builder? 
-              // Usually `GoRouter` injects itself. 
-              
+              // So `GoRouter` (which relies on `InheritedWidget` inside logic) might be accessible
+              // if it places itself above the builder?
+              // Usually `GoRouter` injects itself.
+
               // Safest bet: Use the router object directly if accessible or try context.go.
               // Since `router` is local in `build`, we can't access it here.
               // But we can use `GoRouter.of(context)` might fail.
-              
+
               // ALTERNATIVE: Use a GlobalKey for the GoRouter navigator?
               // Or just try `context.push`. If it fails, we know why.
-              
+
               try {
-                GoRouter.of(context).push('/call?roomId=$roomId&otherUserName=$caller&isCaller=false');
+                GoRouter.of(context).push(
+                    '/call?roomId=$roomId&otherUserName=$caller&isCaller=false');
               } catch (e) {
-                // If GoRouter lookup fails, try Navigator? 
+                // If GoRouter lookup fails, try Navigator?
                 // Getting navigator from this context might fail if we are above it.
                 // Actually `child` IS the navigator.
                 // So we can't easily navigate FROM `IncomingCallWrapper` context without a key.
@@ -289,7 +297,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
     final invitationId = invData['id'];
 
     Timer? expiryTimer;
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -304,7 +312,8 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
 
         return AlertDialog(
           title: const Text('Game Challenge'),
-          content: Text('$sender has challenged you to a game!\n\nThis invitation expires in 60 seconds.'),
+          content: Text(
+              '$sender has challenged you to a game!\n\nThis invitation expires in 60 seconds.'),
           actions: [
             TextButton(
               onPressed: () {

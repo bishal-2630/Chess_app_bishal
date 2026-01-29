@@ -6,6 +6,7 @@ import '../../services/config.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../services/notification_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DjangoAuthService {
   // Singleton pattern
@@ -13,11 +14,26 @@ class DjangoAuthService {
   factory DjangoAuthService() => _instance;
   DjangoAuthService._internal();
 
+  static const String _tokenKey = 'auth_token';
+  static const String _refreshKey = 'refresh_token';
+  static const String _userKey = 'user_data';
+
   final CookieManager _cookieManager = CookieManager.instance();
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    serverClientId: '764791811000-uhnrqvpfe4euoaff3kmiekrc7p7c4obk.apps.googleusercontent.com',
+    serverClientId:
+        '764791811000-uhnrqvpfe4euoaff3kmiekrc7p7c4obk.apps.googleusercontent.com',
   );
-  
+  Future<void> initialize() async {
+    final prefs = await SharedPreferences.getInstance();
+    _accessToken = prefs.getString(_tokenKey);
+    _refreshToken = prefs.getString(_refreshKey);
+    final userData = prefs.getString(_userKey);
+    if (userData != null) {
+      _currentUser = json.decode(userData);
+      NotificationService().connect();
+    }
+  }
+
   // User data storage
   Map<String, dynamic>? _currentUser;
   bool _isGuest = false;
@@ -52,7 +68,8 @@ class DjangoAuthService {
   }
 
   // Email/Password Login
-  Future<Map<String, dynamic>> signInWithEmailPassword(String email, String password) async {
+  Future<Map<String, dynamic>> signInWithEmailPassword(
+      String email, String password) async {
     logoutGuest(); // Clear guest state
     print('🔐 Attempting Django sign in with email: $email');
 
@@ -77,20 +94,32 @@ class DjangoAuthService {
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-        
+
         if (responseData['success'] == true) {
           _currentUser = responseData['user'];
           print('✅ Django login successful: ${responseData['user']['email']}');
-          
+
           // Store tokens if available
           if (responseData['tokens'] != null) {
             _accessToken = responseData['tokens']['access'];
             _refreshToken = responseData['tokens']['refresh'];
           }
-          
+
           // Connect to Notification Service to show user online
           NotificationService().connect();
-          
+
+          // Save tokens and user data to SharedPreferences
+          final prefs = await SharedPreferences.getInstance();
+          if (_accessToken != null) {
+            await prefs.setString(_tokenKey, _accessToken!);
+          }
+          if (_refreshToken != null) {
+            await prefs.setString(_refreshKey, _refreshToken!);
+          }
+          if (_currentUser != null) {
+            await prefs.setString(_userKey, json.encode(_currentUser));
+          }
+
           return {
             'success': true,
             'user': responseData['user'],
@@ -109,7 +138,7 @@ class DjangoAuthService {
         String errorMessage = 'Login failed';
         try {
           final errorData = json.decode(response.body);
-          
+
           // Check for message field first
           if (errorData['message'] != null) {
             errorMessage = errorData['message'];
@@ -127,7 +156,7 @@ class DjangoAuthService {
         } catch (e) {
           errorMessage = 'Network error during login: ${response.statusCode}';
         }
-        
+
         print('❌ Network error during login: $errorMessage');
         return {
           'success': false,
@@ -141,6 +170,7 @@ class DjangoAuthService {
         'error': 'Network error: $e',
       };
     }
+    // Removed unreachable code for saving tokens and user data.
   }
 
   // Email/Password Registration
@@ -168,31 +198,31 @@ class DjangoAuthService {
 
       if (response.statusCode == 201) {
         final responseData = json.decode(response.body);
-        
+
         // Store user data
         _currentUser = responseData['user'];
-        
+
         // Handle cookies for web view
         String? rawCookie = response.headers['set-cookie'];
         if (rawCookie != null) {
           print('🍪 Found cookies to inject');
           await _injectCookies(rawCookie);
         }
-        
+
         print('✅ Django registration successful: ${_currentUser?['email']}');
-        
+
         // Connect to Notification Service to show user online
         NotificationService().connect();
-        
-        return {
-          'success': true,
-          'user': _currentUser,
-          'tokens': responseData
-        };
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_tokenKey, _accessToken!);
+        await prefs.setString(_refreshKey, _refreshToken!);
+        await prefs.setString(_userKey, json.encode(_currentUser));
+
+        return {'success': true, 'user': _currentUser, 'tokens': responseData};
       } else {
         final errorData = json.decode(response.body);
         String errorMessage = 'Registration failed';
-        
+
         if (errorData['detail'] != null) {
           errorMessage = errorData['detail'];
         } else if (errorData['email'] != null) {
@@ -204,12 +234,9 @@ class DjangoAuthService {
         } else if (errorData['non_field_errors'] != null) {
           errorMessage = errorData['non_field_errors'][0];
         }
-        
+
         print('❌ Django registration error: $errorMessage');
-        return {
-          'success': false,
-          'error': errorMessage
-        };
+        return {'success': false, 'error': errorMessage};
       }
     } catch (e) {
       print('❌ Network error during registration: $e');
@@ -233,7 +260,8 @@ class DjangoAuthService {
         return {'success': false, 'error': 'Sign in cancelled'};
       }
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
       // Send Google token to Django backend
       final url = '${_baseUrl}google-login/';
@@ -254,10 +282,10 @@ class DjangoAuthService {
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-        
+
         // Store user data
         _currentUser = responseData['user'];
-        
+
         // Store tokens (Backend returns them at root level)
         if (responseData['access'] != null) {
           _accessToken = responseData['access'];
@@ -267,45 +295,43 @@ class DjangoAuthService {
           _accessToken = responseData['tokens']['access'];
           _refreshToken = responseData['tokens']['refresh'];
         }
-        
+
         // Handle cookies for web view
         String? rawCookie = response.headers['set-cookie'];
         if (rawCookie != null) {
           print('🍪 Found cookies to inject');
           await _injectCookies(rawCookie);
         }
-        
+
         print('✅ Google sign in successful: ${_currentUser?['email']}');
-        
+
         // Connect to Notification Service to show user online
         NotificationService().connect();
-        
-        return {
-          'success': true,
-          'user': _currentUser,
-          'tokens': responseData
-        };
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_tokenKey, _accessToken!);
+        await prefs.setString(_refreshKey, _refreshToken!);
+        await prefs.setString(_userKey, json.encode(_currentUser));
+
+        return {'success': true, 'user': _currentUser, 'tokens': responseData};
       } else {
         final errorData = json.decode(response.body);
         String errorMessage = 'Google sign in failed';
-        
+
         if (errorData['detail'] != null) {
           errorMessage = errorData['detail'];
         } else if (errorData['error'] != null) {
           errorMessage = errorData['error'];
         }
-        
+
         print('❌ Google sign in error: $errorMessage');
-        return {
-          'success': false,
-          'error': errorMessage
-        };
+        return {'success': false, 'error': errorMessage};
       }
     } catch (e) {
       print('❌ Google sign in error: $e');
       return {
         'success': false,
-        'error': 'Google sign in failed. Please make sure Google Play Services are updated.'
+        'error':
+            'Google sign in failed. Please make sure Google Play Services are updated.'
       };
     }
   }
@@ -347,14 +373,17 @@ class DjangoAuthService {
       } else {
         return {
           'success': false,
-          'message': 'Server error: ${response.statusCode}. ${responseData['message'] ?? ""}',
+          'message':
+              'Server error: ${response.statusCode}. ${responseData['message'] ?? ""}',
         };
       }
     } on TimeoutException {
-      print("⏱️ Request timeout - backend might be slow or email sending delayed");
+      print(
+          "⏱️ Request timeout - backend might be slow or email sending delayed");
       return {
         'success': false,
-        'message': 'Connection timeout. The server is taking too long to respond. Please try again.',
+        'message':
+            'Connection timeout. The server is taking too long to respond. Please try again.',
       };
     } catch (e) {
       print("❌ Network error: $e");
@@ -441,7 +470,7 @@ class DjangoAuthService {
   Future<void> signOut() async {
     try {
       print('🔄 Signing out from Django');
-      
+
       // Capture refresh token before clearing
       final String? tokenToBlacklist = _refreshToken;
 
@@ -451,17 +480,21 @@ class DjangoAuthService {
       _guestName = null;
       _accessToken = null;
       _refreshToken = null;
-      
+
       // Disconnect Notification Service (User goes offline)
       NotificationService().disconnect();
-      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_tokenKey);
+      await prefs.remove(_refreshKey);
+      await prefs.remove(_userKey);
+
       // Clear cookies
       try {
         await _clearCookies();
       } catch (e) {
         print('⚠️ Cookie clearing failed: $e');
       }
-      
+
       // Sign out from Google
       try {
         await _googleSignIn.signOut();
@@ -473,21 +506,23 @@ class DjangoAuthService {
       if (tokenToBlacklist != null) {
         final url = '${_baseUrl}logout/';
         print('📡 Sending blacklist request to: $url');
-        
+
         try {
-          await http.post(
-            Uri.parse(url),
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            body: json.encode({'refresh': tokenToBlacklist}),
-          ).timeout(const Duration(seconds: 3));
+          await http
+              .post(
+                Uri.parse(url),
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+                },
+                body: json.encode({'refresh': tokenToBlacklist}),
+              )
+              .timeout(const Duration(seconds: 3));
         } catch (e) {
           print('ℹ️ Backend logout call result: User logged out locally ($e)');
         }
       }
-      
+
       print('✅ Signed out successfully');
     } catch (e) {
       print('❌ Sign out error: $e');
@@ -503,29 +538,32 @@ class DjangoAuthService {
     try {
       Uri uri = Uri.parse(_baseUrl);
       String domain = uri.host;
-      
-      List<String> cookies = rawCookie.split(RegExp(r',(?=\s*[a-zA-Z0-9_-]+=)')); 
-      
+
+      List<String> cookies =
+          rawCookie.split(RegExp(r',(?=\s*[a-zA-Z0-9_-]+=)'));
+
       for (String cookie in cookies) {
         int equalsIndex = cookie.indexOf('=');
         if (equalsIndex == -1) continue;
-        
+
         String key = cookie.substring(0, equalsIndex).trim();
         String valueAndAttributes = cookie.substring(equalsIndex + 1).trim();
-        
+
         int semiIndex = valueAndAttributes.indexOf(';');
-        String value = semiIndex == -1 ? valueAndAttributes : valueAndAttributes.substring(0, semiIndex);
-        
+        String value = semiIndex == -1
+            ? valueAndAttributes
+            : valueAndAttributes.substring(0, semiIndex);
+
         print('🍪 Injecting Cookie: $key for domain: $domain');
-        
+
         await _cookieManager.setCookie(
-          url: WebUri(_baseUrl), 
-          name: key, 
+          url: WebUri(_baseUrl),
+          name: key,
           value: value,
           domain: domain,
           path: "/",
-          isHttpOnly: false, 
-          isSecure: uri.scheme == 'https', 
+          isHttpOnly: false,
+          isSecure: uri.scheme == 'https',
         );
       }
     } catch (e) {
