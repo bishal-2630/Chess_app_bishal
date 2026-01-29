@@ -326,7 +326,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
                   action: 'accept',
                 ).then((result) {
                   if (result['success']) {
-                    context.push('/chess?roomId=$roomId&color=b');
+                    context.go('/chess?roomId=$roomId&color=b');
                   }
                 });
               },

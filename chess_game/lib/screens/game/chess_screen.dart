@@ -328,6 +328,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
     String fullUrl = serverUrl;
     if (!fullUrl.endsWith("/")) fullUrl += "/";
     fullUrl += "$roomId/";
+    print("📡 DEBUG: Connecting to Room URL: $fullUrl");
 
     setState(() {
       _callStatus = "Connecting...";
