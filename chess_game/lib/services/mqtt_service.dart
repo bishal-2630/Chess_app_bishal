@@ -4,6 +4,7 @@ import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'game_service.dart';
 
 class MqttService {
   static final MqttService _instance = MqttService._internal();
@@ -52,6 +53,18 @@ class MqttService {
         // Handle action button taps
         if (response.actionId == 'decline') {
           print('❌ User declined call from notification');
+          
+          final caller = data['caller'] ?? data['payload']['caller'];
+          final roomId = data['room_id'] ?? data['payload']['room_id'];
+           
+          // Send decline signal to backend
+          if (caller != null && roomId != null) {
+             GameService.declineCall(
+                callerUsername: caller,
+                roomId: roomId,
+              );
+          }
+          
           cancelCallNotification();
           return;
         } else if (response.actionId == 'accept') {
