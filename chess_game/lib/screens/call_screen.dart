@@ -39,6 +39,29 @@ class _CallScreenState extends State<CallScreen> {
     MqttService().cancelCallNotification();
     _initRenderers();
     _connect();
+    _listenForDecline();
+  }
+
+  void _listenForDecline() {
+    MqttService().notifications.listen((data) {
+      if (!mounted) return;
+      
+      final type = data['type'];
+      if (type == 'call_declined') {
+        final decliner = data['data'] != null ? data['data']['decliner'] : data['payload']['decliner'];
+        print("❌ Call declined by $decliner");
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$decliner declined the call'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        
+        MqttService().stopAudio();
+        Navigator.pop(context);
+      }
+    });
   }
 
   Future<void> _initRenderers() async {

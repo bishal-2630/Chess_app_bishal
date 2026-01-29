@@ -185,6 +185,12 @@ class MqttService {
         payload['room_id'],
         json.encode(data),
       );
+    } else if (type == 'call_declined') {
+      print('🔔 MQTT: Call declined by user');
+      // If we are currently calling this room/user, we should notify listeners
+      cancelCallNotification(); // Stop ringtone if we were ringing
+      // Broadcast to listeners (CallScreen will pick this up)
+      _notificationController.add(data);
     }
     
     print('🔔 MQTT: Broadcasting to stream listeners');

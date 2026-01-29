@@ -255,7 +255,12 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
             onPressed: () {
               MqttService().cancelCallNotification();
               Navigator.of(dialogContext).pop();
-              // Decline logic here if needed (send signal)
+              
+              // Send decline signal to caller
+              GameService.declineCall(
+                callerUsername: caller,
+                roomId: roomId,
+              );
             },
             child: const Text('Decline', style: TextStyle(color: Colors.red)),
           ),

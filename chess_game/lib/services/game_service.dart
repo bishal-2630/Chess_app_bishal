@@ -247,4 +247,34 @@ class GameService {
       return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }
+
+  // Decline call
+  static Future<Map<String, dynamic>> declineCall({
+    required String callerUsername,
+    required String roomId,
+  }) async {
+    try {
+      print('📞 CALL DECLINE: Sending to caller: $callerUsername');
+      
+      final response = await http.post(
+        Uri.parse('${_baseUrl}call/decline/'),
+        headers: await _getAuthHeaders(),
+        body: json.encode({
+          'caller_username': callerUsername,
+          'room_id': roomId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ CALL DECLINE: Successfully sent to $callerUsername');
+        return {'success': true};
+      } else {
+        print('❌ CALL DECLINE: Failed with status ${response.statusCode}');
+        return {'success': false, 'error': 'Failed to decline call'};
+      }
+    } catch (e) {
+      print('❌ CALL DECLINE: Exception - ${e.toString()}');
+      return {'success': false, 'error': 'Network error: ${e.toString()}'};
+    }
+  }
 }
