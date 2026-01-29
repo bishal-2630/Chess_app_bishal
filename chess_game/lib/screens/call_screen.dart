@@ -51,15 +51,37 @@ class _CallScreenState extends State<CallScreen> {
         final decliner = data['data'] != null ? data['data']['decliner'] : data['payload']['decliner'];
         print("❌ Call declined by $decliner");
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$decliner declined the call'),
-            backgroundColor: Colors.red,
+        // Stop audio immediately
+        MqttService().stopAudio();
+        
+        // Show a dialog instead of just a snackbar for better visibility
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Call Declined'),
+            content: Text('$decliner declined the call.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                  if (mounted) Navigator.of(context).pop(); // Close CallScreen
+                },
+                child: const Text('OK'),
+              ),
+            ],
           ),
         );
         
-        MqttService().stopAudio();
-        Navigator.pop(context);
+        // Auto-close after 2 seconds
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+             // Close dialog
+             Navigator.of(context).pop(); 
+             // Close screen
+             if (mounted) Navigator.of(context).pop();
+          }
+        });
       }
     });
   }

@@ -54,15 +54,30 @@ class MqttService {
         if (response.actionId == 'decline') {
           print('❌ User declined call from notification');
           
-          final caller = data['caller'] ?? data['payload']['caller'];
-          final roomId = data['room_id'] ?? data['payload']['room_id'];
-           
-          // Send decline signal to backend
-          if (caller != null && roomId != null) {
-             GameService.declineCall(
-                callerUsername: caller,
-                roomId: roomId,
-              );
+          try {
+            final payloadMap = data['payload'] as Map<String, dynamic>;
+            final caller = payloadMap['caller'];
+            final roomId = payloadMap['room_id'];
+            
+            print('❌ Processing decline for Caller: $caller, Room: $roomId');
+
+            if (caller != null && roomId != null) {
+               GameService.declineCall(
+                  callerUsername: caller,
+                  roomId: roomId,
+                ).then((_) => print('✅ Decline signal sent from notification'));
+            } else {
+              print('⚠️ Missing caller or room_id in payload for decline');
+            }
+          } catch (e) {
+            print('⚠️ Error parsing payload for decline: $e');
+            // Fallback: try to extract from root if structure is different
+            if (data['caller'] != null) {
+               GameService.declineCall(
+                  callerUsername: data['caller'],
+                  roomId: data['room_id'],
+                );
+            }
           }
           
           cancelCallNotification();
