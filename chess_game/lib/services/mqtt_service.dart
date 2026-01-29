@@ -259,7 +259,7 @@ class MqttService {
     
     // Create notification channel for calls if it doesn't exist
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      'chess_incoming_calls',
+      'chess_incoming_calls_v2', // Changed ID to ensure update
       'Incoming Calls',
       description: 'Notifications for incoming calls',
       importance: Importance.max,
@@ -279,7 +279,7 @@ class MqttService {
       channel.name,
       channelDescription: channel.description,
       importance: Importance.max,
-      priority: Priority.high,
+      priority: Priority.max, // Increased to max
       showWhen: true,
       fullScreenIntent: true,
       category: AndroidNotificationCategory.call,
@@ -325,6 +325,11 @@ class MqttService {
     const int callNotificationId = 999;
     await flutterLocalNotificationsPlugin.cancel(callNotificationId);
     await stopAudio();
+    
+    // Broadcast clean up event to close any open dialogs
+    _notificationController.add({
+      'type': 'call_ended',
+    });
   }
 
   void onConnected() {

@@ -171,9 +171,19 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
       final payload = data['data'] ?? data['payload'];
       final action = data['action']; // Check if this came from a notification action
 
-      if (type == 'call_invitation') {
+      if (type == 'call_ended') {
+        print('📞 Call ended event received');
+        if (_isDialogShowing) {
+          Navigator.of(context).pop(); // Close dialog
+          _isDialogShowing = false;
+        }
+      } else if (type == 'call_invitation') {
         // If user tapped Accept on notification, go directly to call screen
         if (action == 'accept') {
+          if (_isDialogShowing) {
+             Navigator.of(context).pop();
+             _isDialogShowing = false;
+          }
           final caller = payload['caller'];
           final roomId = payload['room_id'];
           print('📞 Auto-accepting call from notification');
@@ -226,9 +236,12 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
 
   void _showIncomingCallDialog(Map<String, dynamic> callData) {
     if (!mounted) return;
+    if (_isDialogShowing) return; // Don't show if already showing
 
     final caller = callData['caller'];
     final roomId = callData['room_id'];
+    
+    _isDialogShowing = true; // Set to true when showing
 
     showDialog(
       context:
@@ -253,6 +266,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
         actions: [
           TextButton(
             onPressed: () {
+              _isDialogShowing = false;
               MqttService().cancelCallNotification();
               Navigator.of(dialogContext).pop();
               
@@ -266,6 +280,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
           ),
           ElevatedButton(
             onPressed: () {
+              _isDialogShowing = false;
               MqttService().cancelCallNotification();
               Navigator.of(dialogContext).pop();
               // Navigate to call screen as Callee (isCaller=false)
@@ -281,7 +296,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
           ),
         ],
       ),
-    );
+    ).then((_) => _isDialogShowing = false);
   }
 
   void _showGameInvitationDialog(Map<String, dynamic> invData) {
