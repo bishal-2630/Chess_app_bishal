@@ -104,7 +104,7 @@ class MqttService {
         json.encode(data),
       );
     } else if (type == 'call_invitation') {
-      _playRingtone();
+      playSound('sounds/ringtone.mp3');
       _showLocalNotification(
         'Incoming Call',
         '${payload['caller']} is calling you...',
@@ -153,14 +153,16 @@ class MqttService {
     print('MQTT: OnSubscribed to topic $topic');
   }
 
-  Future<void> _playRingtone() async {
-    if (_isPlaying) return;
+  Future<void> playSound(String fileName) async {
+    if (_isPlaying) await stopAudio();
     try {
       _isPlaying = true;
+      print('MQTT: Playing sound $fileName');
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-      await _audioPlayer.play(AssetSource('sounds/ringtone.mp3'));
+      // The path should be relative to the assets folder, e.g., 'sounds/ringtone.mp3'
+      await _audioPlayer.play(AssetSource(fileName));
     } catch (e) {
-      print('MQTT: Error playing ringtone: $e');
+      print('MQTT: Error playing sound $fileName: $e');
       _isPlaying = false;
     }
   }

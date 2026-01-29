@@ -30,7 +30,6 @@ class _CallScreenState extends State<CallScreen> {
   RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
   bool _inCall = false;
   String _status = "Connecting...";
-  final AudioPlayer _localAudioPlayer = AudioPlayer();
   bool _isMuted = false;
 
   @override
@@ -78,7 +77,7 @@ class _CallScreenState extends State<CallScreen> {
     
     _signalingService.onCallAccepted = () {
       print("✅ Call accepted by peer");
-      _stopCallingTone();
+      MqttService().stopAudio();
       setState(() {
         _inCall = true;
         _status = "Connected";
@@ -106,7 +105,7 @@ class _CallScreenState extends State<CallScreen> {
     // 2. If Caller, send notification to invitee and play calling tone
     if (widget.isCaller) {
       setState(() => _status = "Calling ${widget.otherUserName}...");
-      _playCallingTone();
+      // Sound already started in UserListScreen
       
       // Delay slightly to ensure WS is connecting? sending via HTTP is independent.
       final result = await GameService.sendCallSignal(
@@ -115,30 +114,11 @@ class _CallScreenState extends State<CallScreen> {
       );
       
       if (!result['success']) {
-        _stopCallingTone();
+        MqttService().stopAudio();
         setState(() => _status = "Failed to call: ${result['error']}");
       }
     } else {
       setState(() => _status = "Joining call with ${widget.otherUserName}...");
-    }
-  }
-
-  Future<void> _playCallingTone() async {
-    try {
-      await _localAudioPlayer.setReleaseMode(ReleaseMode.loop);
-      // Using same ringtone as "calling tone" (waiting sound) for now
-      // Or if there's a specific calling tone, we can use that.
-      await _localAudioPlayer.play(AssetSource('sounds/ringtone.mp3'));
-    } catch (e) {
-      print("Error playing calling tone: $e");
-    }
-  }
-
-  Future<void> _stopCallingTone() async {
-    try {
-      await _localAudioPlayer.stop();
-    } catch (e) {
-      print("Error stopping calling tone: $e");
     }
   }
 
@@ -152,11 +132,10 @@ class _CallScreenState extends State<CallScreen> {
 
   @override
   void dispose() {
-    _stopCallingTone();
-    _localAudioPlayer.dispose();
     _localRenderer.dispose();
     _remoteRenderer.dispose();
     _signalingService.hangUp();
+    MqttService().stopAudio();
     super.dispose();
   }
 

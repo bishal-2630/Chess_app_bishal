@@ -297,6 +297,7 @@ class UserCard extends StatelessWidget {
                   onPressed: () {
                     // Generate a room ID for the call
                     final roomId = 'call_${DateTime.now().millisecondsSinceEpoch}';
+                    MqttService().playSound('sounds/call_ringtone.mp3');
                     // Navigate to call screen as Caller
                     context.push(
                       '/call?roomId=$roomId&otherUserName=${user['username']}&isCaller=true'
