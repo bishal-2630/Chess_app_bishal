@@ -4,13 +4,13 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import './websocket_helper.dart';
 
-typedef void StreamStateCallback(MediaStream stream);
+typedef StreamStateCallback = void Function(MediaStream stream);
 
 class SignalingService {
   WebSocketChannel? _channel;
   RTCPeerConnection? _peerConnection;
   MediaStream? _localStream;
-  List<RTCIceCandidate> _remoteCandidates = [];
+  final List<RTCIceCandidate> _remoteCandidates = [];
 
   // Call handling
   Map<String, dynamic>? _pendingOffer;
@@ -156,12 +156,14 @@ class SignalingService {
       RTCVideoRenderer localVideo, RTCVideoRenderer remoteVideo) async {
     try {
       await _openUserMedia(localVideo, remoteVideo);
-      if (_localStream == null)
+      if (_localStream == null) {
         throw Exception("Failed to get local media stream");
+      }
 
       await _createPeerConnection();
-      if (_peerConnection == null)
+      if (_peerConnection == null) {
         throw Exception("Failed to create PeerConnection");
+      }
 
       RTCSessionDescription offer = await _peerConnection!.createOffer();
       await _peerConnection!.setLocalDescription(offer);
@@ -273,9 +275,6 @@ class SignalingService {
     };
 
     try {
-      if (navigator.mediaDevices == null)
-        throw Exception("MediaDevices not available");
-
       var stream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
       _localStream = stream;
 

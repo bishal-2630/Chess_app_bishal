@@ -14,7 +14,7 @@ class UserListScreen extends StatefulWidget {
 
 class _UserListScreenState extends State<UserListScreen> {
   final DjangoAuthService _authService = DjangoAuthService();
-  List<dynamic> _onlineUsers = [];
+  final List<dynamic> _onlineUsers = [];
   List<dynamic> _allUsers = [];
   bool _isLoading = true;
   String _searchQuery = '';

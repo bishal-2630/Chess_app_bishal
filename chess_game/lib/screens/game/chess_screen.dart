@@ -14,7 +14,7 @@ import 'package:permission_handler/permission_handler.dart';
 class ChessScreen extends StatefulWidget {
   final String? roomId;
   final String? color;
-  const ChessScreen({Key? key, this.roomId, this.color}) : super(key: key);
+  const ChessScreen({super.key, this.roomId, this.color});
 
   @override
   State<ChessScreen> createState() => _ChessGameScreenState();
@@ -54,9 +54,9 @@ class _ChessGameScreenState extends State<ChessScreen> {
   String? pendingPromotion; // Stores the pawn that needs promotion
 
   // Audio Call State
-  SignalingService _signalingService = SignalingService();
-  RTCVideoRenderer _localRenderer = RTCVideoRenderer();
-  RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
+  final SignalingService _signalingService = SignalingService();
+  final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
+  final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
 
   bool _isConnectedToRoom = false;
   bool _isAudioOn = false;
@@ -91,7 +91,8 @@ class _ChessGameScreenState extends State<ChessScreen> {
     _initRenderers();
     _loadInviteCount();
     // Refresh invite count every 30 seconds
-    _inviteTimer = Timer.periodic(const Duration(seconds: 30), (_) => _loadInviteCount());
+    _inviteTimer =
+        Timer.periodic(const Duration(seconds: 30), (_) => _loadInviteCount());
     // NotificationService is now connected globally upon login
 
     // Auto-connect if parameters provided via route
@@ -121,7 +122,8 @@ class _ChessGameScreenState extends State<ChessScreen> {
     super.didUpdateWidget(oldWidget);
     // If room info changes while already on the board, reconnect
     if (widget.roomId != oldWidget.roomId && widget.roomId != null) {
-      print("🔄 Room ID changed from ${oldWidget.roomId} to ${widget.roomId}. Reconnecting...");
+      print(
+          "🔄 Room ID changed from ${oldWidget.roomId} to ${widget.roomId}. Reconnecting...");
       _playerColor = widget.color ?? 'w';
       _connectRoom(_defaultServerUrl, widget.roomId!);
     }
@@ -146,7 +148,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
 
     _signalingService.onPlayerLeft = () {
       print("Opponent left");
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text("Opponent left the room. Resetting game."),
         backgroundColor: Colors.redAccent,
         behavior: SnackBarBehavior.floating,
@@ -166,7 +168,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
         _setEphemeralStatus("Disconnected");
       }
       if (!isConnected) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text("Warning: Disconnected from signaling server.")));
       }
     };
@@ -201,7 +203,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
           _isIncomingCall = false;
         });
         _setEphemeralStatus("Call Ended");
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text("Call ended."), duration: Duration(seconds: 2)));
       }
     };
@@ -221,7 +223,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
     setState(() {
       _callStatus = message;
     });
-    _statusTimer = Timer(Duration(seconds: 3), () {
+    _statusTimer = Timer(const Duration(seconds: 3), () {
       if (mounted) {
         setState(() {
           _callStatus = "";
@@ -235,8 +237,8 @@ class _ChessGameScreenState extends State<ChessScreen> {
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
-              title: Text("Incoming Audio Call"),
-              content: Text("Opponent wants to start a voice chat."),
+              title: const Text("Incoming Audio Call"),
+              content: const Text("Opponent wants to start a voice chat."),
               actions: [
                 TextButton(
                   onPressed: () {
@@ -248,11 +250,12 @@ class _ChessGameScreenState extends State<ChessScreen> {
                     });
                     _setEphemeralStatus("Call Declined");
                   },
-                  child: Text("Reject", style: TextStyle(color: Colors.red)),
+                  child:
+                      const Text("Reject", style: TextStyle(color: Colors.red)),
                 ),
                 ElevatedButton.icon(
-                  icon: Icon(Icons.call),
-                  label: Text("Accept"),
+                  icon: const Icon(Icons.call),
+                  label: const Text("Accept"),
                   style:
                       ElevatedButton.styleFrom(backgroundColor: Colors.green),
                   onPressed: () async {
@@ -268,12 +271,12 @@ class _ChessGameScreenState extends State<ChessScreen> {
     showDialog(
         context: context,
         builder: (context) => AlertDialog(
-              title: Text("Disconnected"),
-              content: Text("Opponent has left the room."),
+              title: const Text("Disconnected"),
+              content: const Text("Opponent has left the room."),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text("OK"),
+                  child: const Text("OK"),
                 )
               ],
             ));
@@ -335,7 +338,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
     });
 
     print("Connecting to $fullUrl");
-    final token = await _authService.accessToken;
+    final token = _authService.accessToken;
     _signalingService.connect(fullUrl, token: token);
 
     // Note: Success state is set via onConnectionState callback
@@ -346,7 +349,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
     if (!kIsWeb) {
       var status = await Permission.microphone.request();
       if (status != PermissionStatus.granted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text("Microphone permission is required for audio calls."),
           backgroundColor: Colors.red,
         ));
@@ -393,40 +396,40 @@ class _ChessGameScreenState extends State<ChessScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Play Online'),
+          title: const Text('Play Online'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
                   "Connect to the multiplayer server to play with others."),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
                   _playerColor = 'w';
                   _createRoom(_defaultServerUrl);
                 },
-                child: Text('Create Room (Generate ID)'),
                 style: ElevatedButton.styleFrom(
-                    minimumSize: Size(double.infinity, 40)),
+                    minimumSize: const Size(double.infinity, 40)),
+                child: Text('Create Room (Generate ID)'),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               ElevatedButton(
                 onPressed: () {
                   Navigator.pop(context);
                   _playerColor = 'b';
                   _showJoinDialog(_defaultServerUrl);
                 },
-                child: Text('Join Room (Enter ID)'),
                 style: ElevatedButton.styleFrom(
-                    minimumSize: Size(double.infinity, 40)),
+                    minimumSize: const Size(double.infinity, 40)),
+                child: Text('Join Room (Enter ID)'),
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
             ),
           ],
         );
@@ -437,7 +440,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
   void _createRoom(String serverUrl) {
     // Generate random 4-digit ID
     final String roomId = (1000 + Random().nextInt(9000)).toString();
-    
+
     // Use the unified route-based connection
     context.go('/chess?roomId=$roomId&color=w');
 
@@ -445,25 +448,25 @@ class _ChessGameScreenState extends State<ChessScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Room Created'),
+        title: const Text('Room Created'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Room ID (Share this):'),
-            SizedBox(height: 4),
+            const Text('Room ID (Share this):'),
+            const SizedBox(height: 4),
             Text(
               roomId,
-              style: TextStyle(
+              style: const TextStyle(
                   fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 2),
             ),
-            SizedBox(height: 20),
-            Text('Opponent can join using this ID.'),
+            const SizedBox(height: 20),
+            const Text('Opponent can join using this ID.'),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('OK'),
+            child: const Text('OK'),
           ),
         ],
       ),
@@ -471,20 +474,20 @@ class _ChessGameScreenState extends State<ChessScreen> {
   }
 
   Future<void> _showJoinDialog(String serverUrl) async {
-    final TextEditingController _roomIdController = TextEditingController();
+    final TextEditingController roomIdController = TextEditingController();
 
     return showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Join Room'),
+          title: const Text('Join Room'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
-                controller: _roomIdController,
-                decoration:
-                    InputDecoration(hintText: "Enter Room ID (e.g. 1234)"),
+                controller: roomIdController,
+                decoration: const InputDecoration(
+                    hintText: "Enter Room ID (e.g. 1234)"),
                 keyboardType: TextInputType.number,
               ),
             ],
@@ -492,18 +495,18 @@ class _ChessGameScreenState extends State<ChessScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () {
-                final roomId = _roomIdController.text.trim();
+                final roomId = roomIdController.text.trim();
                 if (roomId.isNotEmpty) {
                   Navigator.pop(context);
                   // Use the unified route-based connection
                   context.go('/chess?roomId=$roomId&color=b');
                 }
               },
-              child: Text('Join'),
+              child: const Text('Join'),
             ),
           ],
         );
@@ -686,11 +689,15 @@ class _ChessGameScreenState extends State<ChessScreen> {
     if (whitePieces == 2 &&
         whiteHasBishopOrKnight &&
         whiteBishops == 0 &&
-        blackPieces == 1) return true;
+        blackPieces == 1) {
+      return true;
+    }
     if (blackPieces == 2 &&
         blackHasBishopOrKnight &&
         blackBishops == 0 &&
-        whitePieces == 1) return true;
+        whitePieces == 1) {
+      return true;
+    }
 
     // King and bishop vs King and bishop with bishops on same color
     if (whitePieces == 2 &&
@@ -812,14 +819,18 @@ class _ChessGameScreenState extends State<ChessScreen> {
     // Update castling rights
     if (piece == 'wk') whiteKingMoved = true;
     if (piece == 'bk') blackKingMoved = true;
-    if (piece == 'wr' && fromCol == 0 && fromRow == 7)
+    if (piece == 'wr' && fromCol == 0 && fromRow == 7) {
       whiteQueensideRookMoved = true;
-    if (piece == 'wr' && fromCol == 7 && fromRow == 7)
+    }
+    if (piece == 'wr' && fromCol == 7 && fromRow == 7) {
       whiteKingsideRookMoved = true;
-    if (piece == 'br' && fromCol == 0 && fromRow == 0)
+    }
+    if (piece == 'br' && fromCol == 0 && fromRow == 0) {
       blackQueensideRookMoved = true;
-    if (piece == 'br' && fromCol == 7 && fromRow == 0)
+    }
+    if (piece == 'br' && fromCol == 7 && fromRow == 0) {
       blackKingsideRookMoved = true;
+    }
 
     // Set en passant target for next move
     if (pieceType == 'p' && (fromRow - toRow).abs() == 2) {
@@ -917,8 +928,8 @@ class _ChessGameScreenState extends State<ChessScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: Text('Pawn Promotion'),
-        content: Text('Choose a piece to promote to:'),
+        title: const Text('Pawn Promotion'),
+        content: const Text('Choose a piece to promote to:'),
         actions: [
           _buildPromotionButton('Queen', 'q', row, col, isWhite),
           _buildPromotionButton('Rook', 'r', row, col, isWhite),
@@ -946,7 +957,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
             'fromCol': selectedCol,
             'toRow': row,
             'toCol': col,
-            'movedPiece': (isWhite ? 'w' : 'b') + 'p',
+            'movedPiece': '${isWhite ? 'w' : 'b'}p',
             'promotion': pieceType,
           });
         }
@@ -1559,7 +1570,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
           final isMyPiece = (isPieceWhite && _playerColor == 'w') ||
               (!isPieceWhite && _playerColor == 'b');
           if (!isMyPiece) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                 content: Text("That is your opponent's piece!"),
                 duration: Duration(milliseconds: 500)));
             return;
@@ -1655,10 +1666,12 @@ class _ChessGameScreenState extends State<ChessScreen> {
       }
 
       // Restore castling rights if needed
-      if (lastMove['movedPiece'] == 'wk')
+      if (lastMove['movedPiece'] == 'wk') {
         whiteKingMoved = moveHistory.any((move) => move['movedPiece'] == 'wk');
-      if (lastMove['movedPiece'] == 'bk')
+      }
+      if (lastMove['movedPiece'] == 'bk') {
         blackKingMoved = moveHistory.any((move) => move['movedPiece'] == 'bk');
+      }
       // Similar for rooks...
 
       // Restore turn
@@ -1813,9 +1826,11 @@ class _ChessGameScreenState extends State<ChessScreen> {
                   CircleAvatar(
                     radius: 24,
                     backgroundColor: Colors.blue[100],
-                    backgroundImage: _authService.currentUser?['profile_picture'] != null
-                        ? NetworkImage(_authService.currentUser!['profile_picture']!)
-                        : null,
+                    backgroundImage:
+                        _authService.currentUser?['profile_picture'] != null
+                            ? NetworkImage(
+                                _authService.currentUser!['profile_picture']!)
+                            : null,
                     child: _authService.currentUser?['profile_picture'] == null
                         ? Icon(
                             Icons.person,
@@ -1871,7 +1886,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
                   ),
                 ),
                 if (whiteInCheck || blackInCheck)
-                  Icon(
+                  const Icon(
                     Icons.warning,
                     color: Colors.red,
                     size: 20,
@@ -1896,13 +1911,14 @@ class _ChessGameScreenState extends State<ChessScreen> {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   // Use the smaller dimension to keep board square and on screen
-                  final size = min(constraints.maxWidth, constraints.maxHeight) * 0.9;
+                  final size =
+                      min(constraints.maxWidth, constraints.maxHeight) * 0.9;
                   return Container(
                     width: size,
                     height: size,
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.brown, width: 4),
-                      boxShadow: [
+                      boxShadow: const [
                         BoxShadow(
                           color: Colors.black26,
                           blurRadius: 10,
@@ -1912,14 +1928,17 @@ class _ChessGameScreenState extends State<ChessScreen> {
                     ),
                     child: GridView.builder(
                       physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 8,
                       ),
                       itemCount: 64,
                       itemBuilder: (context, index) {
                         // Flip board for black player
-                        final row = _playerColor == 'b' ? 7 - (index ~/ 8) : index ~/ 8;
-                        final col = _playerColor == 'b' ? 7 - (index % 8) : index % 8;
+                        final row =
+                            _playerColor == 'b' ? 7 - (index ~/ 8) : index ~/ 8;
+                        final col =
+                            _playerColor == 'b' ? 7 - (index % 8) : index % 8;
                         return _buildChessSquare(row, col);
                       },
                     ),
@@ -1935,14 +1954,14 @@ class _ChessGameScreenState extends State<ChessScreen> {
           // Call Status Footer (Only show when message is active)
           if (_callStatus.isNotEmpty)
             Container(
-              padding: EdgeInsets.all(8),
+              padding: const EdgeInsets.all(8),
               width: double.infinity,
               color: Colors.green[100],
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.info_outline, size: 16, color: Colors.green[800]),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Text(
                     _callStatus,
                     style: TextStyle(
@@ -1962,9 +1981,10 @@ class _ChessGameScreenState extends State<ChessScreen> {
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: _isConnectedToRoom || pendingPromotion != null
-                            ? null
-                            : _undoMove,
+                        onPressed:
+                            _isConnectedToRoom || pendingPromotion != null
+                                ? null
+                                : _undoMove,
                         icon: const Icon(Icons.undo),
                         label: const Text('Undo'),
                         style: ElevatedButton.styleFrom(
@@ -2077,9 +2097,9 @@ class _ChessGameScreenState extends State<ChessScreen> {
 
     return Container(
       height: 40,
-      margin: EdgeInsets.symmetric(vertical: 8),
+      margin: const EdgeInsets.symmetric(vertical: 8),
       child: sortedPieces.isEmpty
-          ? SizedBox()
+          ? const SizedBox()
           : Wrap(
               spacing: 4,
               runSpacing: 4,
@@ -2108,6 +2128,4 @@ class _ChessGameScreenState extends State<ChessScreen> {
             ),
     );
   }
-
-
 }

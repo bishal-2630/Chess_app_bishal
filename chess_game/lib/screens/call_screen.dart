@@ -13,11 +13,11 @@ class CallScreen extends StatefulWidget {
   final bool isCaller;
 
   const CallScreen({
-    Key? key,
+    super.key,
     required this.roomId,
     required this.otherUserName,
     this.isCaller = false,
-  }) : super(key: key);
+  });
 
   @override
   _CallScreenState createState() => _CallScreenState();
@@ -25,9 +25,9 @@ class CallScreen extends StatefulWidget {
 
 class _CallScreenState extends State<CallScreen> {
   final DjangoAuthService _authService = DjangoAuthService();
-  SignalingService _signalingService = SignalingService();
-  RTCVideoRenderer _localRenderer = RTCVideoRenderer();
-  RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
+  final SignalingService _signalingService = SignalingService();
+  final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
+  final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
   bool _inCall = false;
   String _status = "Connecting...";
   bool _isMuted = false;
@@ -54,7 +54,7 @@ class _CallScreenState extends State<CallScreen> {
       _remoteRenderer.srcObject = stream;
       setState(() {});
     });
-    
+
     _signalingService.onPlayerJoined = () {
       print("👋 Peer joined the room");
       if (widget.isCaller) {
@@ -64,17 +64,17 @@ class _CallScreenState extends State<CallScreen> {
     };
 
     _signalingService.onIncomingCall = () async {
-       print("📞 Incoming call offer received");
-       if (!widget.isCaller) {
-         setState(() => _status = "Accepting call...");
-         await _signalingService.acceptCall(_localRenderer, _remoteRenderer);
-         setState(() {
-           _inCall = true;
-           _status = "Connected";
-         });
-       }
+      print("📞 Incoming call offer received");
+      if (!widget.isCaller) {
+        setState(() => _status = "Accepting call...");
+        await _signalingService.acceptCall(_localRenderer, _remoteRenderer);
+        setState(() {
+          _inCall = true;
+          _status = "Connected";
+        });
+      }
     };
-    
+
     _signalingService.onCallAccepted = () {
       print("✅ Call accepted by peer");
       MqttService().stopAudio();
@@ -83,7 +83,7 @@ class _CallScreenState extends State<CallScreen> {
         _status = "Connected";
       });
     };
-    
+
     _signalingService.onEndCall = () {
       print("❌ Call ended by peer");
       if (mounted) {
@@ -96,23 +96,23 @@ class _CallScreenState extends State<CallScreen> {
     // 1. Connect to WebSocket Room
     String baseUrl = AppConfig.socketUrl;
     if (!baseUrl.endsWith("/")) baseUrl += "/";
-    String fullUrl = baseUrl + widget.roomId + "/";
-    
+    String fullUrl = "$baseUrl${widget.roomId}/";
+
     print("📞 Connecting to call room: $fullUrl");
-    final token = await _authService.accessToken;
+    final token = _authService.accessToken;
     _signalingService.connect(fullUrl, token: token);
-    
+
     // 2. If Caller, send notification to invitee and play calling tone
     if (widget.isCaller) {
       setState(() => _status = "Calling ${widget.otherUserName}...");
       // Sound already started in UserListScreen
-      
+
       // Delay slightly to ensure WS is connecting? sending via HTTP is independent.
       final result = await GameService.sendCallSignal(
         receiverUsername: widget.otherUserName,
         roomId: widget.roomId,
       );
-      
+
       if (!result['success']) {
         MqttService().stopAudio();
         setState(() => _status = "Failed to call: ${result['error']}");
@@ -155,20 +155,23 @@ class _CallScreenState extends State<CallScreen> {
                   CircleAvatar(
                     radius: 50,
                     child: Text(
-                      widget.otherUserName.isNotEmpty ? widget.otherUserName[0].toUpperCase() : '?',
-                      style: TextStyle(fontSize: 40),
+                      widget.otherUserName.isNotEmpty
+                          ? widget.otherUserName[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(fontSize: 40),
                     ),
                   ),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
                   Text(
-                     _status,
-                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                     textAlign: TextAlign.center,
+                    _status,
+                    style: const TextStyle(
+                        fontSize: 20, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
                   ),
                   if (_inCall) ...[
-                    SizedBox(height: 20),
-                    Icon(Icons.mic, size: 30, color: Colors.green),
-                    Text("Audio Connected"),
+                    const SizedBox(height: 20),
+                    const Icon(Icons.mic, size: 30, color: Colors.green),
+                    const Text("Audio Connected"),
                   ]
                 ],
               ),
@@ -194,9 +197,9 @@ class _CallScreenState extends State<CallScreen> {
                 FloatingActionButton(
                   backgroundColor: Colors.red,
                   onPressed: () {
-                     _signalingService.sendEndCall();
-                     _signalingService.hangUp();
-                     Navigator.pop(context);
+                    _signalingService.sendEndCall();
+                    _signalingService.hangUp();
+                    Navigator.pop(context);
                   },
                   heroTag: 'hangup_btn',
                   child: const Icon(Icons.call_end),

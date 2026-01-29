@@ -5,40 +5,42 @@ class AppConfig {
   // ============================================================================
   // ENVIRONMENT CONFIGURATION
   // ============================================================================
-  
+
   // Set to true for local development, false for production
   static const bool _isDevelopment = false;
-  
+
   // Production Railway backend URL
-  static const String _productionHost = 'chess-game-app-production.up.railway.app';
-  
+  static const String _productionHost =
+      'chess-game-app-production.up.railway.app';
+
   // Local development configuration
-  static const String _physicalDeviceHost = '192.168.1.76:8000'; 
-  static const String _emulatorHost = '10.0.2.2:8000'; 
-  
+  static const String _physicalDeviceHost = '192.168.1.76:8000';
+  static const String _emulatorHost = '10.0.2.2:8000';
+
   // ============================================================================
   // HOST SELECTION LOGIC
   // ============================================================================
-  
+
   static String get _host {
     // Production mode: use Railway backend
     if (!_isDevelopment) {
       return _productionHost;
     }
-    
+
     // Development mode: detect emulator vs physical device
     // Check for environment variable override first
-    const String envHost = String.fromEnvironment('WEBSOCKET_HOST', defaultValue: '');
+    const String envHost =
+        String.fromEnvironment('WEBSOCKET_HOST', defaultValue: '');
     if (envHost.isNotEmpty) return envHost;
-    
+
     // For Android: detect emulator vs physical device
     if (!kIsWeb && Platform.isAndroid) {
       final isEmulator = Platform.environment['ANDROID_EMULATOR'] == 'true' ||
-                        Platform.version.contains('emulator');
-      
+          Platform.version.contains('emulator');
+
       return isEmulator ? _emulatorHost : _physicalDeviceHost;
     }
-    
+
     // Default to emulator host for other platforms
     return _emulatorHost;
   }
@@ -49,17 +51,17 @@ class AppConfig {
 
   static String get baseUrl {
     if (kIsWeb) return 'http://localhost:8000/api/auth/';
-    
+
     // Use HTTPS for production, HTTP for local development
-    final protocol = _isDevelopment ? 'http' : 'https';
+    const protocol = _isDevelopment ? 'http' : 'https';
     return '$protocol://$_host/api/auth/';
   }
 
   static String get socketUrl {
     if (kIsWeb) return "ws://localhost:8000/ws/call/";
-    
+
     // Use WSS for production, WS for local development
-    final protocol = _isDevelopment ? 'ws' : 'wss';
+    const protocol = _isDevelopment ? 'ws' : 'wss';
     return "$protocol://$_host/ws/call/";
   }
 }

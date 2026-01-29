@@ -59,10 +59,12 @@ class DjangoAuthService {
   Future<void> _saveAuthData() async {
     final prefs = await SharedPreferences.getInstance();
     if (_accessToken != null) await prefs.setString(_tokenKey, _accessToken!);
-    if (_refreshToken != null)
+    if (_refreshToken != null) {
       await prefs.setString(_refreshKey, _refreshToken!);
-    if (_currentUser != null)
+    }
+    if (_currentUser != null) {
       await prefs.setString(_userKey, json.encode(_currentUser));
+    }
   }
 
   String get _baseUrl {

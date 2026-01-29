@@ -1,6 +1,5 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import '../../services/config.dart';
 import 'django_auth_service.dart';
 
@@ -11,7 +10,7 @@ class GameService {
   static Future<Map<String, String>> _getAuthHeaders() async {
     final authService = DjangoAuthService();
     final token = authService.accessToken;
-    
+
     return {
       'Content-Type': 'application/json',
       'Accept': 'application/json',

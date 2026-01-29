@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'dart:ui';
-import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import './mqtt_service.dart';
 import './django_auth_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class BackgroundServiceInstance {
   static Future<void> initializeService() async {
@@ -15,7 +13,8 @@ class BackgroundServiceInstance {
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
       'my_foreground', // id
       'MY FOREGROUND SERVICE', // title
-      description: 'This channel is used for important notifications.', // description
+      description:
+          'This channel is used for important notifications.', // description
       importance: Importance.low, // low importance so it doesn't pop up
     );
 
@@ -63,7 +62,8 @@ class BackgroundServiceInstance {
     if (authService.isLoggedIn) {
       final username = authService.currentUser?['username'];
       if (username != null) {
-        print('Background Service: User logged in, connecting MQTT for $username');
+        print(
+            'Background Service: User logged in, connecting MQTT for $username');
         final mqttService = MqttService();
         await mqttService.initialize();
         await mqttService.connect(username);
@@ -81,7 +81,7 @@ class BackgroundServiceInstance {
           // You can update the tray notification here if needed
         }
       }
-      
+
       // Check connection occasionally
       final authService = DjangoAuthService();
       if (authService.isLoggedIn) {

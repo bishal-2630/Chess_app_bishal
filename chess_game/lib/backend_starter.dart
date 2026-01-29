@@ -61,7 +61,7 @@ class BackendStarter {
       });
 
       // Wait for startup
-      await Future.delayed(Duration(seconds: 10));
+      await Future.delayed(const Duration(seconds: 10));
 
       print('✅ Backend startup initiated');
       return true;

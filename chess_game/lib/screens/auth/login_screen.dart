@@ -43,7 +43,8 @@ class _LoginScreenState extends State<LoginScreen> {
             context.go('/chess');
           }
         } else {
-          _showErrorSnackBar(result['error'] ?? 'Login failed. Please try again.');
+          _showErrorSnackBar(
+              result['error'] ?? 'Login failed. Please try again.');
         }
       } catch (e) {
         _showErrorSnackBar('Login failed. Please try again.');
@@ -117,15 +118,15 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _signInAsGuest() async {
-    final TextEditingController _nameController = TextEditingController();
-    
+    final TextEditingController nameController = TextEditingController();
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: const Text('Enter Guest Username'),
         content: TextField(
-          controller: _nameController,
+          controller: nameController,
           decoration: const InputDecoration(
             labelText: 'Username',
             hintText: 'e.g. ChessPro',
@@ -140,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              final name = _nameController.text.trim();
+              final name = nameController.text.trim();
               if (name.isNotEmpty) {
                 await _authService.loginAsGuest(name);
                 Navigator.pop(context);
@@ -215,177 +216,180 @@ class _LoginScreenState extends State<LoginScreen> {
           child: SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const SizedBox(height: 40),
-
-                // Logo or app name
-                const Text(
-                  'Chess Game',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Welcome back!',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.grey,
-                  ),
-                ),
-
-                const SizedBox(height: 40),
-
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.email),
-                  ),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: _validateEmail,
-                  enabled: !_isLoading,
-                ),
-                const SizedBox(height: 20),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.lock),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
-                      },
-                    ),
-                  ),
-                  validator: _validatePassword,
-                  enabled: !_isLoading,
-                ),
-                const SizedBox(height: 30),
-
-                if (_isLoading)
-                  const Center(child: CircularProgressIndicator())
-                else
-                  ElevatedButton(
-                    onPressed: _signInWithEmailPassword,
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text(
-                      'Login',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                  ),
-
-                const SizedBox(height: 20),
-
-                // Forgot password
-                TextButton(
-                  onPressed:
-                      _isLoading ? null : () => context.go('/forgot-password'),
-                  child: const Text('Forgot Password?'),
-                ),
-                const SizedBox(height: 30),
-
-                // Divider with "OR"
-                Row(
-                  children: [
-                    Expanded(child: Divider(color: Colors.grey[300])),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      child: Text(
-                        'OR',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    Expanded(child: Divider(color: Colors.grey[300])),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-
-                // Google Sign-In Button
-                OutlinedButton.icon(
-                  onPressed: _isLoading ? null : _signInWithGoogle,
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 50),
-                    side: const BorderSide(color: Colors.blue),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  icon: Image.asset(
-                    'assets/google_logo.png',
-                    width: 24,
-                    height: 24,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(Icons.g_mobiledata, size: 24);
-                    },
-                  ),
-                  label: const Text(
-                    'Sign in with Google',
-                    style: TextStyle(color: Colors.blue),
-                  ),
-                ),
-                
-                const SizedBox(height: 15),
-
-                // Guest Play Button
-                TextButton.icon(
-                  onPressed: _isLoading ? null : _signInAsGuest,
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  icon: const Icon(Icons.person_outline),
-                  label: const Text(
-                    'Play as Guest',
-                    style: TextStyle(fontSize: 16),
-                  ),
-                ),
-
-                const SizedBox(height: 30),
-
-                // Register link
-                Row(
+              child: Form(
+                key: _formKey,
+                child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text("Don't have an account?"),
-                    TextButton(
-                      onPressed:
-                          _isLoading ? null : () => context.go('/register'),
-                      child: const Text(
-                        'Register',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                    const SizedBox(height: 40),
+
+                    // Logo or app name
+                    const Text(
+                      'Chess Game',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
                       ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Welcome back!',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey,
+                      ),
+                    ),
+
+                    const SizedBox(height: 40),
+
+                    TextFormField(
+                      controller: _emailController,
+                      decoration: const InputDecoration(
+                        labelText: 'Email',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.email),
+                      ),
+                      keyboardType: TextInputType.emailAddress,
+                      validator: _validateEmail,
+                      enabled: !_isLoading,
+                    ),
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.lock),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                        ),
+                      ),
+                      validator: _validatePassword,
+                      enabled: !_isLoading,
+                    ),
+                    const SizedBox(height: 30),
+
+                    if (_isLoading)
+                      const Center(child: CircularProgressIndicator())
+                    else
+                      ElevatedButton(
+                        onPressed: _signInWithEmailPassword,
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 50),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'Login',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                      ),
+
+                    const SizedBox(height: 20),
+
+                    // Forgot password
+                    TextButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () => context.go('/forgot-password'),
+                      child: const Text('Forgot Password?'),
+                    ),
+                    const SizedBox(height: 30),
+
+                    // Divider with "OR"
+                    Row(
+                      children: [
+                        Expanded(child: Divider(color: Colors.grey[300])),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          child: Text(
+                            'OR',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Expanded(child: Divider(color: Colors.grey[300])),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Google Sign-In Button
+                    OutlinedButton.icon(
+                      onPressed: _isLoading ? null : _signInWithGoogle,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                        side: const BorderSide(color: Colors.blue),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      icon: Image.asset(
+                        'assets/google_logo.png',
+                        width: 24,
+                        height: 24,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(Icons.g_mobiledata, size: 24);
+                        },
+                      ),
+                      label: const Text(
+                        'Sign in with Google',
+                        style: TextStyle(color: Colors.blue),
+                      ),
+                    ),
+
+                    const SizedBox(height: 15),
+
+                    // Guest Play Button
+                    TextButton.icon(
+                      onPressed: _isLoading ? null : _signInAsGuest,
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      icon: const Icon(Icons.person_outline),
+                      label: const Text(
+                        'Play as Guest',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ),
+
+                    const SizedBox(height: 30),
+
+                    // Register link
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text("Don't have an account?"),
+                        TextButton(
+                          onPressed:
+                              _isLoading ? null : () => context.go('/register'),
+                          child: const Text(
+                            'Register',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-            ),
+              ),
             ),
           ),
         ),

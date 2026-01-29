@@ -13,13 +13,14 @@ class NotificationService {
   NotificationService._internal();
 
   WebSocketChannel? _channel;
-  final StreamController<Map<String, dynamic>> _notificationController = 
+  final StreamController<Map<String, dynamic>> _notificationController =
       StreamController<Map<String, dynamic>>.broadcast();
-  
+
   // Track last received notification to avoid duplicates if necessary
   String? _lastNotificationId;
 
-  Stream<Map<String, dynamic>> get notifications => _notificationController.stream;
+  Stream<Map<String, dynamic>> get notifications =>
+      _notificationController.stream;
 
   bool get isConnected => _channel != null;
 
@@ -30,11 +31,12 @@ class NotificationService {
     }
 
     try {
-      final notificationUrl = '${AppConfig.socketUrl.replaceAll('/ws/call/', '/ws/notifications/')}';
+      final notificationUrl =
+          AppConfig.socketUrl.replaceAll('/ws/call/', '/ws/notifications/');
       print('🔔 Connecting to notification service: $notificationUrl');
 
       // Get Authentication Token
-      final token = await DjangoAuthService().accessToken;
+      final token = DjangoAuthService().accessToken;
       String urlWithToken = notificationUrl;
       final Map<String, String> headers = {};
       if (token != null) {
@@ -89,7 +91,7 @@ class NotificationService {
   void handleExternalNotification(Map<String, dynamic> data) {
     try {
       print('🔔 Handling external notification: ${data['type']}');
-      
+
       // Prevent duplicate processing if possible (can be expanded with unique IDs)
       _notificationController.add(data);
     } catch (e) {

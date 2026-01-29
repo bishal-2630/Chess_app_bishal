@@ -28,7 +28,7 @@ void main() async {
   // Temporarily disabled for testing
   // await BackgroundServiceInstance.initializeService();
 
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -134,7 +134,7 @@ class MyApp extends StatelessWidget {
 
 class IncomingCallWrapper extends StatefulWidget {
   final Widget child;
-  const IncomingCallWrapper({Key? key, required this.child}) : super(key: key);
+  const IncomingCallWrapper({super.key, required this.child});
 
   @override
   _IncomingCallWrapperState createState() => _IncomingCallWrapperState();
