@@ -14,6 +14,7 @@ class MqttService {
   final String broker = 'broker.emqx.io';
   final int port = 1883;
   bool isConnected = false;
+  bool _isListening = false;
 
   final StreamController<Map<String, dynamic>> _notificationController = 
       StreamController<Map<String, dynamic>>.broadcast();
@@ -36,6 +37,8 @@ class MqttService {
     await flutterLocalNotificationsPlugin.initialize(initializationSettings);
   }
 
+  String? _currentUsername;
+
   Future<void> connect(String username) async {
     print('🔌 MQTT: connect() called for username: $username');
     if (isConnected) {
@@ -43,6 +46,7 @@ class MqttService {
       return;
     }
 
+    _currentUsername = username;
     final clientIdentifier = 'flutter_client_${username}_${DateTime.now().millisecondsSinceEpoch}';
     print('🔌 MQTT: Creating client with ID: $clientIdentifier');
     client = MqttServerClient(broker, clientIdentifier);
@@ -70,6 +74,9 @@ class MqttService {
       return;
     }
 
+    // Wait a bit for the connection to stabilize
+    await Future.delayed(Duration(milliseconds: 500));
+
     if (client!.connectionStatus!.state == MqttConnectionState.connected) {
       isConnected = true;
       print('✅ MQTT: Connected successfully');
@@ -79,6 +86,8 @@ class MqttService {
       print('❌ MQTT: Connection failed - state is ${client!.connectionStatus!.state}');
       disconnect();
     }
+    
+    print('🔌 MQTT connect call completed');
   }
 
   void _subscribeToNotifications(String username) {
@@ -88,6 +97,13 @@ class MqttService {
   }
 
   void _listen() {
+    if (_isListening) {
+      print('⚠️ MQTT: Already listening, skipping');
+      return;
+    }
+    
+    _isListening = true;
+    print('👂 MQTT: Setting up message listener');
     client!.updates!.listen((List<MqttReceivedMessage<MqttMessage?>>? c) {
       final MqttPublishMessage recMess = c![0].payload as MqttPublishMessage;
       final String pt =
@@ -161,7 +177,12 @@ class MqttService {
   }
 
   void onConnected() {
-    print('MQTT: OnConnected');
+    print('✅ MQTT: OnConnected callback triggered');
+    isConnected = true;
+    if (_currentUsername != null) {
+      _subscribeToNotifications(_currentUsername!);
+      _listen();
+    }
   }
 
   void onDisconnected() {
@@ -199,6 +220,7 @@ class MqttService {
   void disconnect() {
     client?.disconnect();
     isConnected = false;
+    _isListening = false;
     stopAudio();
   }
 }
