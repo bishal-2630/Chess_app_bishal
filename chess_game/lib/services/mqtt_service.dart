@@ -353,13 +353,10 @@ class MqttService {
       print('✅ MQTT: Call notification sent to system');
     } else if (type == 'call_declined') {
       print('🔔 MQTT: Call declined by user via signaling');
-      await cancelCallNotification(); // Stop ringtone if we were ringing
-      // Broadcast to listeners (CallScreen will pick this up)
-      _notificationController.add(data);
+      cancelCallNotification(); // Stop ringtone
     }
     
-    print('🔔 MQTT: Broadcasting to stream listeners');
-    // Broadcast to internal listeners
+    print('🔔 MQTT: Broadcasting event type: $type');
     _notificationController.add(data);
   }
 
@@ -492,12 +489,7 @@ class MqttService {
       _currentCallRoomId = null;
     }
     
-    await stopAudio();
-    
-    // Broadcast clean up event to close any open dialogs
-    _notificationController.add({
-      'type': 'call_ended',
-    });
+    stopAudio();
   }
   
   void setInCall(bool inCall) {
