@@ -31,6 +31,7 @@ class _CallScreenState extends State<CallScreen> {
   bool _inCall = false;
   String _status = "Connecting...";
   bool _isMuted = false;
+  bool _isExiting = false;
 
   @override
   void initState() {
@@ -47,7 +48,7 @@ class _CallScreenState extends State<CallScreen> {
 
   void _listenForDecline() {
     MqttService().notifications.listen((data) {
-      if (!mounted) return;
+      if (!mounted || _isExiting) return;
       
       final type = data['type'];
       if (type == 'call_declined') {
@@ -57,18 +58,7 @@ class _CallScreenState extends State<CallScreen> {
         // Stop audio (ringback tone)
         MqttService().stopAudio();
         
-        // Update UI to show "Call Declined" instead of dialog
-        setState(() {
-          _status = "Call Declined";
-          _inCall = false;
-        });
-        
-        // Auto-close after 2 seconds
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-             Navigator.of(context).pop();
-          }
-        });
+        _handleCallEnd("Call Declined");
       }
     });
   }
@@ -118,21 +108,10 @@ class _CallScreenState extends State<CallScreen> {
 
     _signalingService.onEndCall = () {
       print("❌ Call ended by peer");
-      if (mounted) {
+      if (mounted && !_isExiting) {
         // Stop audio if any (should already be stopped)
         MqttService().stopAudio();
-        
-        setState(() {
-          _status = "Call Ended";
-          _inCall = false;
-        });
-        
-        // Auto-close after 2 seconds
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-             Navigator.of(context).pop();
-          }
-        });
+        _handleCallEnd("Call Ended");
       }
     };
   }
@@ -172,6 +151,29 @@ class _CallScreenState extends State<CallScreen> {
       await _signalingService.startCall(_localRenderer, _remoteRenderer);
     } catch (e) {
       print("Start call failed: $e");
+    }
+  }
+
+  void _handleCallEnd(String status) {
+    if (_isExiting) return;
+    _isExiting = true;
+    
+    // Ensure audio is stopped
+    MqttService().stopAudio();
+    
+    if (mounted) {
+      setState(() {
+        _status = status;
+        _inCall = false;
+      });
+      
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          if (Navigator.canPop(context)) {
+            Navigator.of(context).pop();
+          }
+        }
+      });
     }
   }
 

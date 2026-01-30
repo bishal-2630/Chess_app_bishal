@@ -405,9 +405,8 @@ class MqttService {
     try {
       print('MQTT: Stopping audio...');
       await _audioPlayer.stop();
-      await _audioPlayer.release(); // Release resources to ensure it actually stops
       _isPlaying = false;
-      print('MQTT: Audio stopped and released.');
+      print('MQTT: Audio stopped.');
     } catch (e) {
       print('MQTT: Error stopping audio: $e');
     }
