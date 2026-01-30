@@ -11,31 +11,27 @@ import 'django_auth_service.dart';
 
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse response) async {
-  print('🔔 BACKGROUND: Notification tapped. Action: ${response.actionId}');
+  print('🔔 Notification Action: ${response.actionId}');
   
   try {
     // 1. STOP AUDIO IMMEDIATELY (Prioritize UX)
     for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
       final SendPort? sendPort = IsolateNameServer.lookupPortByName(portName);
       if (sendPort != null) {
-        print('🔔 BACKGROUND: Sending stop_audio to $portName');
+        print('🔔 Signaling stop_audio to $portName');
         sendPort.send('stop_audio');
       }
     }
 
     // 2. Initialize services
-    print('🔔 BACKGROUND: Initializing DjangoAuthService...');
     await DjangoAuthService().initialize(autoConnectMqtt: false);
     
     if (response.payload != null) {
       final data = json.decode(response.payload!);
       final type = data['type'];
-      print('🔔 BACKGROUND: Type: $type, Action: ${response.actionId}');
 
       if (response.actionId == 'accept') {
-        print('🔔 BACKGROUND: Accept tapped. App should be launching...');
-        // The OS handles launching the app because showsUserInterface is true.
-        // We just return here to avoid race conditions.
+        print('🔔 Background: Accept tapped');
         return;
       }
 
@@ -45,32 +41,28 @@ void notificationTapBackground(NotificationResponse response) async {
           final caller = payload['caller'];
           final roomId = payload['room_id'];
           if (caller != null && roomId != null) {
-            print('🔔 BACKGROUND: Declining call from $caller');
+            print('❌ Background: Declining call from $caller');
             await GameService.declineCall(callerUsername: caller, roomId: roomId);
-            print('🔔 BACKGROUND: Call decline signal sent');
           }
         } else if (type == 'game_invitation') {
           final payload = data['payload'];
           final invitationId = payload['id'];
           if (invitationId != null) {
-            print('🔔 BACKGROUND: Declining game invite $invitationId');
+            print('❌ Background: Declining game invite $invitationId');
             await GameService.respondToInvitation(invitationId: invitationId, action: 'decline');
-            print('🔔 BACKGROUND: Game invite decline sent');
           }
         }
       }
     }
     
     // 3. Manual cancel since we removed cancelNotification: true
-    if (response.notificationId != null) {
-      print('🔔 BACKGROUND: Manually canceling notification ${response.notificationId}');
+    if (response.id != null) {
       final fln = FlutterLocalNotificationsPlugin();
-      await fln.cancel(response.notificationId!);
+      await fln.cancel(response.id!);
     }
 
-  } catch (e, stack) {
-    print('❌ BACKGROUND ERROR: $e');
-    print('❌ BACKGROUND STACK: $stack');
+  } catch (e) {
+    print('❌ Background Action Error: $e');
   }
 }
 

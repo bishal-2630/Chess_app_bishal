@@ -254,9 +254,6 @@ class GameService {
     required String roomId,
   }) async {
     try {
-      print('📞 [DEBUG] CALL SIGNAL: Sending to receiver: $receiverUsername');
-      print('📞 [DEBUG] CALL SIGNAL: URL: ${_baseUrl}call/send/');
-      
       final response = await _authenticatedRequest(
         'POST',
         '${_baseUrl}call/send/',
@@ -266,14 +263,11 @@ class GameService {
         }),
       );
 
-      print('📞 [DEBUG] CALL SIGNAL: Status: ${response.statusCode}');
-      print('📞 [DEBUG] CALL SIGNAL: Body: ${response.body}');
-
       if (response.statusCode == 200) {
-        print('✅ [DEBUG] CALL SIGNAL: Successfully sent to $receiverUsername');
+        print('✅ Call signal sent to $receiverUsername');
         return {'success': true};
       } else {
-        print('❌ [DEBUG] CALL SIGNAL: Failed');
+        print('❌ Call signal failed: ${response.statusCode}');
         return {'success': false, 'error': 'Failed to send call signal'};
       }
     } catch (e) {
@@ -288,9 +282,6 @@ class GameService {
     required String roomId,
   }) async {
     try {
-      print('📞 [DEBUG] CALL DECLINE: Sending to caller: $callerUsername');
-      print('📞 [DEBUG] CALL DECLINE: URL: ${_baseUrl}call/decline/');
-      
       final response = await _authenticatedRequest(
         'POST',
         '${_baseUrl}call/decline/',
@@ -300,12 +291,11 @@ class GameService {
         }),
       );
 
-      print('📞 [DEBUG] CALL DECLINE: Status: ${response.statusCode}');
       if (response.statusCode == 200) {
-        print('✅ [DEBUG] CALL DECLINE: Successfully sent to $callerUsername');
+        print('✅ Call decline sent to $callerUsername');
         return {'success': true};
       } else {
-        print('❌ [DEBUG] CALL DECLINE: Failed: ${response.body}');
+        print('❌ Call decline failed: ${response.statusCode}');
         return {'success': false, 'error': 'Failed to decline call'};
       }
     } catch (e) {
