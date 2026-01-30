@@ -384,10 +384,14 @@ class MqttService {
   }
 
   Future<void> playSound(String fileName) async {
-    if (_isPlaying) await stopAudio();
+    // Ensure any previous audio is completely stopped
+    await stopAudio();
+    
     try {
       _isPlaying = true;
       print('MQTT: Playing sound $fileName');
+      
+      // Reset player mode just in case
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
       // The path should be relative to the assets folder, e.g., 'sounds/ringtone.mp3'
       await _audioPlayer.play(AssetSource(fileName));
@@ -399,8 +403,11 @@ class MqttService {
 
   Future<void> stopAudio() async {
     try {
+      print('MQTT: Stopping audio...');
       await _audioPlayer.stop();
+      await _audioPlayer.release(); // Release resources to ensure it actually stops
       _isPlaying = false;
+      print('MQTT: Audio stopped and released.');
     } catch (e) {
       print('MQTT: Error stopping audio: $e');
     }

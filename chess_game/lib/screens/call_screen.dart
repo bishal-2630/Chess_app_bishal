@@ -35,8 +35,11 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void initState() {
     super.initState();
-    // Stop any incoming ringtone from MqttService and cancel notification
-    MqttService().cancelCallNotification();
+    // Only stop incoming ringtone if we are the Callee.
+    // If we are the Caller, the ringback tone (started in UserListScreen) should continue playing.
+    if (!widget.isCaller) {
+      MqttService().cancelCallNotification();
+    }
     _initRenderers();
     _connect();
     _listenForDecline();
@@ -51,40 +54,17 @@ class _CallScreenState extends State<CallScreen> {
         final decliner = data['data'] != null ? data['data']['decliner'] : data['payload']['decliner'];
         print("❌ Call declined by $decliner");
         
-        // Stop audio immediately
+        // Stop audio (ringback tone)
         MqttService().stopAudio();
         
-        // Show a dialog instead of just a snackbar for better visibility
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (dialogContext) {
-            // Auto-close dialog after 2 seconds
-            Future.delayed(const Duration(seconds: 2), () {
-              // Use 'context' (CallScreen context) which is stable if mounted.
-              // If dialog is closed, mounted is false (because we popped screen in .then).
-              // If dialog is open, mounted is true, and pop() closes the dialog.
-              if (mounted) {
-                 Navigator.of(context).pop(); 
-              }
-            });
-            
-            return AlertDialog(
-              title: const Text('Call Declined'),
-              content: Text('$decliner declined the call.'),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    // Close dialog immediately
-                    Navigator.of(dialogContext).pop();
-                  },
-                  child: const Text('OK'),
-                ),
-              ],
-            );
-          },
-        ).then((_) {
-          // Once dialog is closed (by user or timer), close the screen
+        // Update UI to show "Call Declined" instead of dialog
+        setState(() {
+          _status = "Call Declined";
+          _inCall = false;
+        });
+        
+        // Auto-close after 2 seconds
+        Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
              Navigator.of(context).pop();
           }
@@ -139,7 +119,20 @@ class _CallScreenState extends State<CallScreen> {
     _signalingService.onEndCall = () {
       print("❌ Call ended by peer");
       if (mounted) {
-        Navigator.pop(context);
+        // Stop audio if any (should already be stopped)
+        MqttService().stopAudio();
+        
+        setState(() {
+          _status = "Call Ended";
+          _inCall = false;
+        });
+        
+        // Auto-close after 2 seconds
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+             Navigator.of(context).pop();
+          }
+        });
       }
     };
   }
