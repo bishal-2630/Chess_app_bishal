@@ -258,6 +258,15 @@ class _CallScreenState extends State<CallScreen> {
                     onPressed: () {
                       _signalingService.sendEndCall();
                       _signalingService.hangUp();
+                      
+                      // If we are the caller and the call hasn't started yet, send explicitly cancel signal
+                      if (widget.isCaller && !_inCall) {
+                        GameService.cancelCall(
+                          receiverUsername: widget.otherUserName,
+                          roomId: widget.roomId,
+                        );
+                      }
+                      
                       // Use context.go to return to users list
                       context.go('/users');
                     },

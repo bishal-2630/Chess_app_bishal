@@ -303,4 +303,31 @@ class GameService {
       return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }
+  // Cancel call (caller side)
+  static Future<Map<String, dynamic>> cancelCall({
+    required String receiverUsername,
+    required String roomId,
+  }) async {
+    try {
+      final response = await _authenticatedRequest(
+        'POST',
+        '${_baseUrl}call/cancel/',
+        body: json.encode({
+          'receiver_username': receiverUsername,
+          'room_id': roomId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ Call cancel sent to $receiverUsername');
+        return {'success': true};
+      } else {
+        print('❌ Call cancel failed: ${response.statusCode}');
+        return {'success': false, 'error': 'Failed to cancel call'};
+      }
+    } catch (e) {
+      print('❌ CALL CANCEL: Exception - ${e.toString()}');
+      return {'success': false, 'error': 'Network error: ${e.toString()}'};
+    }
+  }
 }

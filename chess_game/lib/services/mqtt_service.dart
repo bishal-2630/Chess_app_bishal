@@ -353,8 +353,8 @@ class MqttService {
         json.encode(data),
       );
       print('✅ MQTT: Call notification sent to system');
-    } else if (type == 'call_declined') {
-      print('🔔 MQTT: Call declined by user via signaling');
+    } else if (type == 'call_declined' || type == 'call_cancelled') {
+      print('🔔 MQTT: Call $type by user via signaling');
       cancelCallNotification(); // Stop ringtone
     }
     
@@ -517,19 +517,23 @@ class MqttService {
   }
 
   Future<void> playSound(String fileName) async {
+    final isolateName = Isolate.current.debugName ?? 'unknown';
     // Ensure any previous audio is completely stopped
     await stopAudio();
     
     try {
       _isPlaying = true;
-      print('MQTT: Playing sound $fileName');
+      print('MQTT [$isolateName]: Playing sound $fileName');
+      
+      // Ensure volume is up (it might have been set to 0 by stopAudio)
+      await _audioPlayer.setVolume(1.0);
       
       // Reset player mode just in case
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
       // The path should be relative to the assets folder, e.g., 'sounds/ringtone.mp3'
       await _audioPlayer.play(AssetSource(fileName));
     } catch (e) {
-      print('MQTT: Error playing sound $fileName: $e');
+      print('MQTT [$isolateName]: Error playing sound $fileName: $e');
       _isPlaying = false;
     }
   }

@@ -210,7 +210,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
 
     print('🔔 Processing $type (action: $action)');
 
-    if (type == 'call_ended' || type == 'call_declined') {
+    if (type == 'call_ended' || type == 'call_declined' || type == 'call_cancelled') {
       print('📞 Call dismissing event received: $type');
       if (_isDialogShowing) {
         Navigator.of(context).pop();
