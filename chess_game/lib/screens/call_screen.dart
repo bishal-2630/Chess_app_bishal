@@ -6,6 +6,7 @@ import '../services/django_auth_service.dart';
 import '../services/game_service.dart';
 import '../services/mqtt_service.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:go_router/go_router.dart';
 
 class CallScreen extends StatefulWidget {
   final String roomId;
@@ -179,7 +180,8 @@ class _CallScreenState extends State<CallScreen> {
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) {
           // Use context.go instead of pop because call screen replaces home
-          context.go('/home');
+          // Redirecting to /users which is the player list
+          context.go('/users');
         }
       });
     }
@@ -256,8 +258,8 @@ class _CallScreenState extends State<CallScreen> {
                     onPressed: () {
                       _signalingService.sendEndCall();
                       _signalingService.hangUp();
-                      // Use context.go to return home
-                      context.go('/home');
+                      // Use context.go to return to users list
+                      context.go('/users');
                     },
                     heroTag: 'hangup_btn',
                     child: const Icon(Icons.call_end),
