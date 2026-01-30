@@ -198,11 +198,11 @@ class MqttService {
           
           _isInCall = true; // Mark as in-call to prevent further ringing
           
-          // Force stop audio before canceling notification (redundant but safe)
-          await stopAudio();
-          await cancelCallNotification();
+          // Cleanup in background without awaiting
+          stopAudio();
+          cancelCallNotification();
           
-          // Broadcast to open call screen
+          // Broadcast to open call screen immediately
           _emitNotification({
             ...data,
             'action': 'accept',

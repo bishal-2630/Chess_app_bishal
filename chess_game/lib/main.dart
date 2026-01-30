@@ -225,8 +225,9 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
            _isDialogShowing = false;
         }
 
-        await MqttService().stopAudio();
-        await MqttService().cancelCallNotification();
+        // Cleanup in background without awaiting
+        MqttService().stopAudio();
+        MqttService().cancelCallNotification();
 
         final caller = payload['caller'];
         final roomId = payload['room_id'];
@@ -247,28 +248,21 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
           _isDialogShowing = false;
         }
 
-        await MqttService().stopAudio();
-        await MqttService().cancelCallNotification();
-        
-        final invitationId = payload['id'];
         final roomId = payload['room_id'];
         
+        // Navigate immediately
+        context.go('/chess?roomId=$roomId&color=b');
+
+        // Cleanup in background
+        MqttService().stopAudio();
+        MqttService().cancelCallNotification();
+        
+        final invitationId = payload['id'];
         if (invitationId != null) {
-          final result = await GameService.respondToInvitation(
+          GameService.respondToInvitation(
             invitationId: invitationId,
             action: 'accept',
           );
-          
-          if (result['success']) {
-            print('✅ Successfully accepted game invite via notification');
-            try {
-              context.go('/chess?roomId=$roomId&color=b');
-            } catch (e) {
-              print("Navigation failed: $e");
-            }
-          } else {
-            print('❌ Failed to accept game invite: ${result['error']}');
-          }
         }
       } else {
         _showGameInvitationDialog(payload);
@@ -358,12 +352,11 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
               _isDialogShowing = false;
               Navigator.of(dialogContext).pop();
 
-              // Cleanup and then navigate
-              MqttService().cancelCallNotification().then((_) {
-                 if (mounted) {
-                   context.go('/call?roomId=$roomId&otherUserName=$caller&isCaller=false');
-                 }
-              });
+              // Navigate immediately
+              context.go('/call?roomId=$roomId&otherUserName=$caller&isCaller=false');
+
+              // Cleanup in background
+              MqttService().cancelCallNotification();
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             child: const Text('Accept'),
