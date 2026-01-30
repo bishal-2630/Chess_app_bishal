@@ -303,5 +303,4 @@ class GameService {
       return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }
-  }
 }
