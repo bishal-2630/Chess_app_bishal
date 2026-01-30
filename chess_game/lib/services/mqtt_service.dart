@@ -4,6 +4,8 @@ import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'dart:ui';
+import 'dart:isolate';
 import 'game_service.dart';
 import 'django_auth_service.dart';
 
@@ -34,6 +36,15 @@ void notificationTapBackground(NotificationResponse response) async {
           if (invitationId != null) {
               await GameService.respondToInvitation(invitationId: invitationId, action: 'decline');
           }
+       }
+       
+       // Stop audio in main isolate
+       final SendPort? sendPort = IsolateNameServer.lookupPortByName('chess_game_port');
+       if (sendPort != null) {
+         print('🔔 Background: Sending stop_audio signal to main isolate');
+         sendPort.send('stop_audio');
+       } else {
+         print('🔔 Background: Could not find main isolate port');
        }
      } catch (e) {
        print('❌ Background Error: $e');
@@ -136,8 +147,12 @@ class MqttService {
         } else if (response.actionId == 'accept') {
           print('✅ User accepted call from notification');
           
+          
           _isInCall = true; // Mark as in-call to prevent further ringing
-          cancelCallNotification();
+          
+          // Force stop audio before canceling notification (redundant but safe)
+          await stopAudio();
+          await cancelCallNotification();
           
           // Broadcast to open call screen
           _notificationController.add({

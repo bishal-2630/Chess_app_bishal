@@ -14,6 +14,8 @@ import 'services/mqtt_service.dart';
 import 'services/game_service.dart';
 import 'services/background_service.dart';
 import 'dart:async';
+import 'dart:isolate';
+import 'dart:ui';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +29,19 @@ void main() async {
   // Initialize background service to keep MQTT alive when app is closed
   // Temporarily disabled for testing
   // await BackgroundServiceInstance.initializeService();
+
+  // Setup Isolate communication for background audio stopping
+  final ReceivePort port = ReceivePort();
+  IsolateNameServer.removePortNameMapping('chess_game_port');
+  IsolateNameServer.registerPortWithName(port.sendPort, 'chess_game_port');
+  
+  port.listen((message) async {
+    print("🔔 Main Isolate received message: $message");
+    if (message == 'stop_audio') {
+      print("🔔 Stopping audio via Isolate signal");
+      await MqttService().stopAudio();
+    }
+  });
 
   runApp(const MyApp());
 }
