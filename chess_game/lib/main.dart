@@ -338,12 +338,13 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
         ),
         actions: [
           TextButton(
-            onPressed: () async {
+            onPressed: () {
+              print('📞 UI: Decline button pressed');
               _isDialogShowing = false;
-              await MqttService().cancelCallNotification();
               Navigator.of(dialogContext).pop();
               
-              // Send decline signal to caller
+              // Perform cleanup in background
+              MqttService().cancelCallNotification();
               GameService.declineCall(
                 callerUsername: caller,
                 roomId: roomId,
@@ -352,17 +353,17 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
             child: const Text('Decline', style: TextStyle(color: Colors.red)),
           ),
           ElevatedButton(
-            onPressed: () async {
+            onPressed: () {
+              print('📞 UI: Accept button pressed');
               _isDialogShowing = false;
-              await MqttService().cancelCallNotification();
               Navigator.of(dialogContext).pop();
-              // Navigate to call screen as Callee (isCaller=false)
-              try {
-                GoRouter.of(context).push(
-                    '/call?roomId=$roomId&otherUserName=$caller&isCaller=false');
-              } catch (e) {
-                print("Navigation failed: $e");
-              }
+
+              // Cleanup and then navigate
+              MqttService().cancelCallNotification().then((_) {
+                 if (mounted) {
+                   context.go('/call?roomId=$roomId&otherUserName=$caller&isCaller=false');
+                 }
+              });
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             child: const Text('Accept'),
@@ -401,8 +402,8 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
             TextButton(
               onPressed: () {
                 expiryTimer?.cancel();
-                MqttService().cancelCallNotification();
                 Navigator.of(dialogContext).pop();
+                MqttService().cancelCallNotification();
                 _declineInvitation(invitationId);
               },
               child: const Text('Decline', style: TextStyle(color: Colors.red)),
@@ -410,14 +411,14 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
             ElevatedButton(
               onPressed: () {
                 expiryTimer?.cancel();
-                MqttService().cancelCallNotification();
                 Navigator.of(dialogContext).pop();
-                // Directly Accept
+                MqttService().cancelCallNotification();
+                
                 GameService.respondToInvitation(
                   invitationId: invitationId,
                   action: 'accept',
                 ).then((result) {
-                  if (result['success']) {
+                  if (result['success'] && mounted) {
                     context.go('/chess?roomId=$roomId&color=b');
                   }
                 });
