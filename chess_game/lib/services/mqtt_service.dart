@@ -119,10 +119,34 @@ class MqttService {
       onDidReceiveNotificationResponse: onNotificationTapped,
       onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
-    
-    // Setup Isolate communication
-    // Note: main.dart calls this once. Background service calls this as well.
-    // We check if we are in background service to register a second port.
+
+    // Create High Priority Channels
+    const AndroidNotificationChannel challengeChannel = AndroidNotificationChannel(
+      'chess_challenges',
+      'Chess Challenges',
+      description: 'Notifications for chess game invitations',
+      importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+      showBadge: true,
+    );
+
+    const AndroidNotificationChannel callChannel = AndroidNotificationChannel(
+      'chess_incoming_calls_v2',
+      'Incoming Calls',
+      description: 'Notifications for incoming calls',
+      importance: Importance.max,
+      playSound: false, // We use playSound() manually
+      enableVibration: true,
+      showBadge: true,
+    );
+
+    final androidPlugin = flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+            
+    await androidPlugin?.createNotificationChannel(challengeChannel);
+    await androidPlugin?.createNotificationChannel(callChannel);
   }
   
   void initializeIsolateListener({bool isBackground = false}) {
@@ -365,14 +389,14 @@ class MqttService {
   Future<void> _showGameNotification(String title, String body, String payload) async {
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
-      'chess_notifications_high',
-      'Chess High Priority',
-      channelDescription: 'Notifications for chess challenges and calls',
+      'chess_challenges',
+      'Chess Challenges',
+      channelDescription: 'Notifications for chess game invitations',
       importance: Importance.max,
-      priority: Priority.high,
+      priority: Priority.max,
       showWhen: true,
-      fullScreenIntent: true,
-      category: AndroidNotificationCategory.call,
+      fullScreenIntent: true, // Show on lock screen
+      category: AndroidNotificationCategory.email, // Or message/event
       visibility: NotificationVisibility.public,
       actions: <AndroidNotificationAction>[
         AndroidNotificationAction(
@@ -407,27 +431,11 @@ class MqttService {
   Future<void> _showCallNotification(String caller, String roomId, String payload) async {
     print('📱 Creating call notification for $caller');
     
-    // Create notification channel for calls if it doesn't exist
-    const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      'chess_incoming_calls_v2', // Changed ID to ensure update
-      'Incoming Calls',
-      description: 'Notifications for incoming calls',
-      importance: Importance.max,
-      playSound: false, // We're playing our own ringtone
-      enableVibration: true,
-      showBadge: true,
-    );
-
-    await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(channel);
-
     // Create notification with action buttons
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      channel.id,
-      channel.name,
-      channelDescription: channel.description,
+      'chess_incoming_calls_v2',
+      'Incoming Calls',
+      channelDescription: 'Notifications for incoming calls',
       importance: Importance.max,
       priority: Priority.max, // Increased to max
       showWhen: true,
