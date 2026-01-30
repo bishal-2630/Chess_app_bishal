@@ -88,6 +88,7 @@ class BackgroundServiceInstance {
       // Check connection occasionally
       final authService = DjangoAuthService();
       if (authService.isLoggedIn) {
+        final mqtt = MqttService();
         if (!mqtt.isConnected) {
           final username = authService.currentUser?['username'];
           if (username != null) {
