@@ -105,16 +105,16 @@ class _CallScreenState extends State<CallScreen> {
       }
     };
 
-    _signalingService.onCallAccepted = () {
+    _signalingService.onCallAccepted = () async {
       print("✅ Call accepted by peer");
-      MqttService().stopAudio();
+      await MqttService().stopAudio();
       setState(() {
         _inCall = true;
         _status = "Connected";
       });
     };
 
-    _signalingService.onEndCall = () {
+    _signalingService.onEndCall = () async {
       print("❌ Call ended by peer");
       if (mounted && !_isExiting) {
         // Stop audio if any (should already be stopped)

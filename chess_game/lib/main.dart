@@ -207,32 +207,33 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
           _showIncomingCallDialog(payload);
         }
       } else if (type == 'game_invitation') {
-           print('🎮 Auto-accepting game from notification');
-           // Stop listening to ringtone if any
-           await MqttService().cancelCallNotification();
-           
-           final invitationId = payload['id'];
-           final roomId = payload['room_id'];
-           
-           if (invitationId != null) {
-              GameService.respondToInvitation(
-                invitationId: invitationId,
-                action: 'accept',
-              ).then((result) {
-                  if (result['success']) {
-                    print('✅ Successfully accepted game invite via notification');
-                    try {
-                      context.go('/chess?roomId=$roomId&color=b');
-                    } catch (e) {
-                      print("Navigation failed: $e");
-                    }
-                  } else {
-                    print('❌ Failed to accept game invite: ${result['error']}');
-                  }
-              });
-           }
+        if (action == 'accept') {
+          print('🎮 Auto-accepting game from notification');
+          // Stop listening to ringtone if any
+          await MqttService().cancelCallNotification();
+
+          final invitationId = payload['id'];
+          final roomId = payload['room_id'];
+
+          if (invitationId != null) {
+            GameService.respondToInvitation(
+              invitationId: invitationId,
+              action: 'accept',
+            ).then((result) {
+              if (result['success']) {
+                print('✅ Successfully accepted game invite via notification');
+                try {
+                  context.go('/chess?roomId=$roomId&color=b');
+                } catch (e) {
+                  print("Navigation failed: $e");
+                }
+              } else {
+                print('❌ Failed to accept game invite: ${result['error']}');
+              }
+            });
+          }
         } else {
-           _showGameInvitationDialog(payload);
+          _showGameInvitationDialog(payload);
         }
       } else if (type == 'invitation_response') {
         _handleInvitationResponse(payload);
