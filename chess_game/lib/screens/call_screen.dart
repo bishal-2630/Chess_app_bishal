@@ -178,9 +178,8 @@ class _CallScreenState extends State<CallScreen> {
       
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) {
-          if (Navigator.canPop(context)) {
-            Navigator.of(context).pop();
-          }
+          // Use context.go instead of pop because call screen replaces home
+          context.go('/home');
         }
       });
     }
@@ -234,36 +233,38 @@ class _CallScreenState extends State<CallScreen> {
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 50.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                FloatingActionButton(
-                  backgroundColor: _isMuted ? Colors.blueGrey : Colors.blue,
-                  onPressed: () {
-                    setState(() {
-                      _isMuted = !_isMuted;
-                      _signalingService.muteAudio(_isMuted);
-                    });
-                  },
-                  heroTag: 'mute_btn',
-                  child: Icon(_isMuted ? Icons.mic_off : Icons.mic),
-                ),
-                const SizedBox(width: 32),
-                FloatingActionButton(
-                  backgroundColor: Colors.red,
-                  onPressed: () {
-                    _signalingService.sendEndCall();
-                    _signalingService.hangUp();
-                    Navigator.pop(context);
-                  },
-                  heroTag: 'hangup_btn',
-                  child: const Icon(Icons.call_end),
-                ),
-              ],
+          if (!_isExiting)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 50.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  FloatingActionButton(
+                    backgroundColor: _isMuted ? Colors.blueGrey : Colors.blue,
+                    onPressed: () {
+                      setState(() {
+                        _isMuted = !_isMuted;
+                        _signalingService.muteAudio(_isMuted);
+                      });
+                    },
+                    heroTag: 'mute_btn',
+                    child: Icon(_isMuted ? Icons.mic_off : Icons.mic),
+                  ),
+                  const SizedBox(width: 32),
+                  FloatingActionButton(
+                    backgroundColor: Colors.red,
+                    onPressed: () {
+                      _signalingService.sendEndCall();
+                      _signalingService.hangUp();
+                      // Use context.go to return home
+                      context.go('/home');
+                    },
+                    heroTag: 'hangup_btn',
+                    child: const Icon(Icons.call_end),
+                  ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
