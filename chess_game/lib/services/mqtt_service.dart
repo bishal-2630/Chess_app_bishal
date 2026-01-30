@@ -5,6 +5,41 @@ import 'package:mqtt_client/mqtt_server_client.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'game_service.dart';
+import 'django_auth_service.dart';
+
+@pragma('vm:entry-point')
+void notificationTapBackground(NotificationResponse response) async {
+  print('🔔 Background Notification tapped: ${response.actionId}');
+  
+  // Initialize services needed for API calls
+  await DjangoAuthService().initialize();
+  
+  if (response.payload != null && response.actionId == 'decline') {
+     try {
+       final data = json.decode(response.payload!);
+       final type = data['type'];
+       
+       if (type == 'call_invitation') {
+          final payload = data['payload'];
+          final caller = payload['caller'];
+          final roomId = payload['room_id'];
+          print('❌ Background: Declining call from $caller');
+          if (caller != null && roomId != null) {
+              await GameService.declineCall(callerUsername: caller, roomId: roomId);
+          }
+       } else if (type == 'game_invitation') {
+          final payload = data['payload'];
+          final invitationId = payload['id'];
+          print('❌ Background: Declining game invite $invitationId');
+          if (invitationId != null) {
+              await GameService.respondToInvitation(invitationId: invitationId, action: 'decline');
+          }
+       }
+     } catch (e) {
+       print('❌ Background Error: $e');
+     }
+  }
+}
 
 class MqttService {
   static final MqttService _instance = MqttService._internal();
@@ -23,6 +58,7 @@ class MqttService {
 
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
+  bool _isInCall = false; // Prevents ringing if we are already in a call
   String? _currentCallRoomId;
   final Set<String> _declinedRoomIds = {};
 
@@ -40,6 +76,7 @@ class MqttService {
     await flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: _onNotificationTapped,
+      onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
   }
 
@@ -98,7 +135,10 @@ class MqttService {
           return;
         } else if (response.actionId == 'accept') {
           print('✅ User accepted call from notification');
+          
+          _isInCall = true; // Mark as in-call to prevent further ringing
           cancelCallNotification();
+          
           // Broadcast to open call screen
           _notificationController.add({
             ...data,
@@ -224,6 +264,12 @@ class MqttService {
       // Check if we already suspended/declined this call
       if (_declinedRoomIds.contains(roomId)) {
         print('🚫 MQTT: Ignoring call invitation for declined room: $roomId');
+        return;
+      }
+      
+      // Check if we are already in a call
+      if (_isInCall) {
+        print('🚫 MQTT: Ignoring call invitation - already in a call');
         return;
       }
       
@@ -389,6 +435,10 @@ class MqttService {
     _notificationController.add({
       'type': 'call_ended',
     });
+  }
+  
+  void setInCall(bool inCall) {
+    _isInCall = inCall;
   }
 
   void onConnected() {

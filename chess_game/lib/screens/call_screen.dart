@@ -36,6 +36,8 @@ class _CallScreenState extends State<CallScreen> {
   @override
   void initState() {
     super.initState();
+    print("📞 CallScreen: initState called");
+    MqttService().setInCall(true); // Mark as in-call
     // Only stop incoming ringtone if we are the Callee.
     // If we are the Caller, the ringback tone (started in UserListScreen) should continue playing.
     if (!widget.isCaller) {
@@ -158,8 +160,9 @@ class _CallScreenState extends State<CallScreen> {
     if (_isExiting) return;
     _isExiting = true;
     
-    // Ensure audio is stopped
+    // Ensure audio is stopped and in-call state cleared
     MqttService().stopAudio();
+    MqttService().setInCall(false);
     
     if (mounted) {
       setState(() {
@@ -179,6 +182,7 @@ class _CallScreenState extends State<CallScreen> {
 
   @override
   void dispose() {
+    MqttService().setInCall(false);
     _localRenderer.dispose();
     _remoteRenderer.dispose();
     _signalingService.hangUp();
