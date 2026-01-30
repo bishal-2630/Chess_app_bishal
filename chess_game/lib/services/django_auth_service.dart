@@ -39,7 +39,7 @@ class DjangoAuthService {
   String? get guestName => _guestName;
   String? get accessToken => _accessToken;
 
-  Future<void> initialize() async {
+  Future<void> initialize({bool autoConnectMqtt = true}) async {
     final prefs = await SharedPreferences.getInstance();
     _accessToken = prefs.getString(_tokenKey);
     _refreshToken = prefs.getString(_refreshKey);
@@ -50,7 +50,7 @@ class DjangoAuthService {
       print('💾 Loaded saved user: ${_currentUser?['email']}');
 
       // Auto-connect MQTT if we have a session
-      if (_currentUser?['username'] != null) {
+      if (autoConnectMqtt && _currentUser?['username'] != null) {
         MqttService().connect(_currentUser!['username']);
       }
     }

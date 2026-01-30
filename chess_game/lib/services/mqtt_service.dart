@@ -14,49 +14,49 @@ void notificationTapBackground(NotificationResponse response) async {
   print('🔔 Background Notification tapped: ${response.actionId}');
   
   // 1. STOP AUDIO IMMEDIATELY (Prioritize UX)
+  // Try signaling both main and background service isolates
   try {
-    final SendPort? sendPort = IsolateNameServer.lookupPortByName('chess_game_port');
-    if (sendPort != null) {
-      print('🔔 Background: Sending stop_audio signal to main isolate');
-      sendPort.send('stop_audio');
-    } else {
-      print('🔔 Background: Could not find main isolate port (App killed?)');
+    for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
+      final SendPort? sendPort = IsolateNameServer.lookupPortByName(portName);
+      if (sendPort != null) {
+        print('🔔 Background: Sending stop_audio signal to $portName');
+        sendPort.send('stop_audio');
+      }
     }
   } catch (e) {
-    print('❌ Background Isolate Error: $e');
+    print('❌ Background Isolate Signaling Error: $e');
   }
 
   // 2. Initialize services needed for API calls
-  await DjangoAuthService().initialize();
+  await DjangoAuthService().initialize(autoConnectMqtt: false);
   
   if (response.payload != null && response.actionId == 'decline') {
-     try {
-       final data = json.decode(response.payload!);
-       final type = data['type'];
-       
-       if (type == 'call_invitation') {
-          final payload = data['payload'];
-          final caller = payload['caller'];
-          final roomId = payload['room_id'];
-          print('❌ Background: Declining call from $caller');
-          if (caller != null && roomId != null) {
-              await GameService.declineCall(callerUsername: caller, roomId: roomId);
-          }
-       } else if (type == 'game_invitation') {
-          final payload = data['payload'];
-          final invitationId = payload['id'];
-          print('❌ Background: Declining game invite $invitationId');
-          if (invitationId != null) {
-              await GameService.respondToInvitation(invitationId: invitationId, action: 'decline');
-          }
-          if (invitationId != null) {
-              await GameService.respondToInvitation(invitationId: invitationId, action: 'decline');
-          }
-       }
-       // Audio stop signal already sent at start
-     } catch (e) {
-       print('❌ Background Error: $e');
-     }
+    try {
+      final data = json.decode(response.payload!);
+      final type = data['type'];
+      print('🔔 Background: Action type decoded: $type');
+      
+      if (type == 'call_invitation') {
+        final payload = data['payload'];
+        final caller = payload['caller'];
+        final roomId = payload['room_id'];
+        print('❌ Background: Sending decline signal to caller $caller for room $roomId');
+        if (caller != null && roomId != null) {
+          await GameService.declineCall(callerUsername: caller, roomId: roomId);
+          print('✅ Background: Decline signal sent successfully');
+        }
+      } else if (type == 'game_invitation') {
+        final payload = data['payload'];
+        final invitationId = payload['id'];
+        print('❌ Background: Sending decline response for game invite $invitationId');
+        if (invitationId != null) {
+          await GameService.respondToInvitation(invitationId: invitationId, action: 'decline');
+          print('✅ Background: Game invitation declined successfully');
+        }
+      }
+    } catch (e) {
+      print('❌ Background Isolate Business Logic Error: $e');
+    }
   }
 }
 
@@ -97,29 +97,31 @@ class MqttService {
     
     await flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
-      onDidReceiveNotificationResponse: _onNotificationTapped,
+      onDidReceiveNotificationResponse: onNotificationTapped,
       onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
     
     // Setup Isolate communication
-    _initializeIsolateListener();
+    // Note: main.dart calls this once. Background service calls this as well.
+    // We check if we are in background service to register a second port.
   }
   
-  void _initializeIsolateListener() {
-    print("🔔 Initializing Isolate Listener in MqttService");
-    IsolateNameServer.removePortNameMapping('chess_game_port');
-    IsolateNameServer.registerPortWithName(_listenerPort.sendPort, 'chess_game_port');
+  void initializeIsolateListener({bool isBackground = false}) {
+    final portName = isBackground ? 'chess_game_bg_port' : 'chess_game_main_port';
+    print("🔔 Initializing Isolate Listener: $portName");
+    IsolateNameServer.removePortNameMapping(portName);
+    IsolateNameServer.registerPortWithName(_listenerPort.sendPort, portName);
     
     _listenerPort.listen((message) async {
-      print("🔔 MqttService Isolate received: $message");
+      print("🔔 $portName received: $message");
       if (message == 'stop_audio') {
-        print("🔔 STOPPING AUDIO via Isolate signal");
+        print("🔔 STOPPING AUDIO in isolate via $portName");
         await stopAudio();
       }
     });
   }
 
-  void _onNotificationTapped(NotificationResponse response) async {
+  void onNotificationTapped(NotificationResponse response) async {
     print('🔔 Notification tapped: ${response.actionId}');
     print('🔔 Payload: ${response.payload}');
     
@@ -134,10 +136,11 @@ class MqttService {
             print('❌ User declined game from notification');
             final invitationId = data['payload']['id'];
             if (invitationId != null) {
-              GameService.respondToInvitation(
+              await GameService.respondToInvitation(
                 invitationId: invitationId,
                 action: 'decline',
-              ).then((_) => print('✅ Decline signal sent for game invite'));
+              );
+              print('✅ Decline signal sent for game invite');
             }
             return;
           } else if (response.actionId == 'accept') {
@@ -161,10 +164,11 @@ class MqttService {
             final roomId = payloadMap['room_id'];
             
             if (caller != null && roomId != null) {
-               GameService.declineCall(
+               await GameService.declineCall(
                   callerUsername: caller,
                   roomId: roomId,
-                ).then((_) => print('✅ Decline signal sent from notification'));
+                );
+                print('✅ Decline signal sent from notification');
             }
           } catch (e) {
             print('⚠️ Error parsing payload for decline: $e');

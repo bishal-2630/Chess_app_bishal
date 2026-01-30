@@ -66,6 +66,7 @@ class BackgroundServiceInstance {
             'Background Service: User logged in, connecting MQTT for $username');
         final mqttService = MqttService();
         await mqttService.initialize();
+        mqttService.initializeIsolateListener(isBackground: true);
         await mqttService.connect(username);
       }
     }

@@ -25,9 +25,10 @@ void main() async {
   // Initialize MQTT Service (sets up local notifications)
   final mqttService = MqttService();
   await mqttService.initialize();
+  mqttService.initializeIsolateListener(isBackground: false);
 
-  // Setup Isolate communication for background audio stopping
-  // Now handled internally by MqttService
+  // Initialize Background Service for persistent connection
+  await BackgroundServiceInstance.initializeService();
 
   runApp(const MyApp());
 }
@@ -147,8 +148,22 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
   @override
   void initState() {
     super.initState();
+    _handleInitialNotification();
     _listenForNotifications();
     _checkInitialAuth();
+  }
+
+  Future<void> _handleInitialNotification() async {
+    final details = await MqttService().flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails();
+    if (details != null && details.didNotificationLaunchApp && details.notificationResponse != null) {
+      print('🚀 App launched via notification action: ${details.notificationResponse?.actionId}');
+      // Delay slightly to ensure navigation is ready
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          MqttService().onNotificationTapped(details.notificationResponse!);
+        }
+      });
+    }
   }
 
   void _checkInitialAuth() async {
