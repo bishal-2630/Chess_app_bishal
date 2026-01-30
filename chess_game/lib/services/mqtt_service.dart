@@ -13,7 +13,20 @@ import 'django_auth_service.dart';
 void notificationTapBackground(NotificationResponse response) async {
   print('🔔 Background Notification tapped: ${response.actionId}');
   
-  // Initialize services needed for API calls
+  // 1. STOP AUDIO IMMEDIATELY (Prioritize UX)
+  try {
+    final SendPort? sendPort = IsolateNameServer.lookupPortByName('chess_game_port');
+    if (sendPort != null) {
+      print('🔔 Background: Sending stop_audio signal to main isolate');
+      sendPort.send('stop_audio');
+    } else {
+      print('🔔 Background: Could not find main isolate port (App killed?)');
+    }
+  } catch (e) {
+    print('❌ Background Isolate Error: $e');
+  }
+
+  // 2. Initialize services needed for API calls
   await DjangoAuthService().initialize();
   
   if (response.payload != null && response.actionId == 'decline') {
@@ -36,16 +49,11 @@ void notificationTapBackground(NotificationResponse response) async {
           if (invitationId != null) {
               await GameService.respondToInvitation(invitationId: invitationId, action: 'decline');
           }
+          if (invitationId != null) {
+              await GameService.respondToInvitation(invitationId: invitationId, action: 'decline');
+          }
        }
-       
-       // Stop audio in main isolate
-       final SendPort? sendPort = IsolateNameServer.lookupPortByName('chess_game_port');
-       if (sendPort != null) {
-         print('🔔 Background: Sending stop_audio signal to main isolate');
-         sendPort.send('stop_audio');
-       } else {
-         print('🔔 Background: Could not find main isolate port');
-       }
+       // Audio stop signal already sent at start
      } catch (e) {
        print('❌ Background Error: $e');
      }
@@ -53,6 +61,9 @@ void notificationTapBackground(NotificationResponse response) async {
 }
 
 class MqttService {
+  // Static port to prevent GC
+  static final ReceivePort _listenerPort = ReceivePort();
+
   static final MqttService _instance = MqttService._internal();
   factory MqttService() => _instance;
   MqttService._internal();
@@ -89,6 +100,23 @@ class MqttService {
       onDidReceiveNotificationResponse: _onNotificationTapped,
       onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
+    
+    // Setup Isolate communication
+    _initializeIsolateListener();
+  }
+  
+  void _initializeIsolateListener() {
+    print("🔔 Initializing Isolate Listener in MqttService");
+    IsolateNameServer.removePortNameMapping('chess_game_port');
+    IsolateNameServer.registerPortWithName(_listenerPort.sendPort, 'chess_game_port');
+    
+    _listenerPort.listen((message) async {
+      print("🔔 MqttService Isolate received: $message");
+      if (message == 'stop_audio') {
+        print("🔔 STOPPING AUDIO via Isolate signal");
+        await stopAudio();
+      }
+    });
   }
 
   void _onNotificationTapped(NotificationResponse response) async {

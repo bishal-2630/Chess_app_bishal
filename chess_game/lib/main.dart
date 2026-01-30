@@ -17,9 +17,6 @@ import 'dart:async';
 import 'dart:isolate';
 import 'dart:ui';
 
-// Global port definition to prevent GC
-final ReceivePort _backgroundPort = ReceivePort();
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -30,17 +27,7 @@ void main() async {
   await mqttService.initialize();
 
   // Setup Isolate communication for background audio stopping
-  IsolateNameServer.removePortNameMapping('chess_game_port');
-  var success = IsolateNameServer.registerPortWithName(_backgroundPort.sendPort, 'chess_game_port');
-  print('🔔 Port registration success: $success');
-  
-  _backgroundPort.listen((message) async {
-    print("🔔 Main Isolate received message: $message");
-    if (message == 'stop_audio') {
-      print("🔔 Stopping audio via Isolate signal");
-      await MqttService().stopAudio();
-    }
-  });
+  // Now handled internally by MqttService
 
   runApp(const MyApp());
 }
