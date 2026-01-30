@@ -71,6 +71,46 @@ class DjangoAuthService {
     return AppConfig.baseUrl;
   }
 
+  // Refresh Token
+  Future<bool> refreshToken() async {
+    if (_refreshToken == null) {
+      print('⚠️ No refresh token available');
+      return false;
+    }
+
+    try {
+      final url = '${_baseUrl}token/refresh/';
+      print('🔄 Refreshing token at: $url');
+      
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'refresh': _refreshToken}),
+      );
+
+      print('📡 Refresh response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        _accessToken = data['access'];
+        // Some backends rotate refresh tokens too
+        if (data['refresh'] != null) {
+          _refreshToken = data['refresh'];
+        }
+        await _saveAuthData();
+        print('✅ Token refreshed successfully');
+        return true;
+      } else {
+        print('❌ Token refresh failed: ${response.body}');
+        await signOut(); // Force logout if refresh fails
+        return false;
+      }
+    } catch (e) {
+      print('❌ Error refreshing token: $e');
+      return false;
+    }
+  }
+
   // Guest login
   Future<void> loginAsGuest(String name) async {
     _isGuest = true;

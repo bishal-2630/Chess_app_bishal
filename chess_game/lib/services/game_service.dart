@@ -18,12 +18,46 @@ class GameService {
     };
   }
 
+  // Helper for authenticated requests with auto-refresh
+  static Future<http.Response> _authenticatedRequest(
+    String method,
+    String url, {
+    Map<String, String>? headers,
+    Object? body,
+    int retryCount = 0,
+  }) async {
+    headers ??= await _getAuthHeaders();
+    
+    http.Response response;
+    try {
+      if (method == 'POST') {
+        response = await http.post(Uri.parse(url), headers: headers, body: body);
+      } else {
+        response = await http.get(Uri.parse(url), headers: headers);
+      }
+
+      // Check for token expiration (401)
+      if (response.statusCode == 401 && retryCount < 1) {
+        print('🔄 401 Unauthorized - Attempting token refresh...');
+        final refreshed = await DjangoAuthService().refreshToken();
+        if (refreshed) {
+          // Retry with new token
+          final newHeaders = await _getAuthHeaders();
+          return _authenticatedRequest(method, url, headers: newHeaders, body: body, retryCount: retryCount + 1);
+        }
+      }
+      return response;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   // Get online users
   static Future<Map<String, dynamic>> getOnlineUsers() async {
     try {
-      final response = await http.get(
-        Uri.parse('${_baseUrl}users/online/'),
-        headers: await _getAuthHeaders(),
+      final response = await _authenticatedRequest(
+        'GET',
+        '${_baseUrl}users/online/',
       );
 
       if (response.statusCode == 200) {
@@ -44,9 +78,9 @@ class GameService {
   // Get all users
   static Future<Map<String, dynamic>> getAllUsers() async {
     try {
-      final response = await http.get(
-        Uri.parse('${_baseUrl}users/all/'),
-        headers: await _getAuthHeaders(),
+      final response = await _authenticatedRequest(
+        'GET',
+        '${_baseUrl}users/all/',
       );
 
       print('📡 Users API Response: ${response.statusCode}');
@@ -74,9 +108,9 @@ class GameService {
     String? roomId,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse('${_baseUrl}users/status/'),
-        headers: await _getAuthHeaders(),
+      final response = await _authenticatedRequest(
+        'POST',
+        '${_baseUrl}users/status/',
         body: json.encode({
           'is_online': isOnline,
           'room_id': roomId,
@@ -105,9 +139,9 @@ class GameService {
     required String roomId,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse('${_baseUrl}invitations/send/'),
-        headers: await _getAuthHeaders(),
+      final response = await _authenticatedRequest(
+        'POST',
+        '${_baseUrl}invitations/send/',
         body: json.encode({
           'receiver_username': receiverUsername,
           'room_id': roomId,
@@ -136,9 +170,9 @@ class GameService {
   // Get my invitations
   static Future<Map<String, dynamic>> getMyInvitations() async {
     try {
-      final response = await http.get(
-        Uri.parse('${_baseUrl}invitations/my/'),
-        headers: await _getAuthHeaders(),
+      final response = await _authenticatedRequest(
+        'GET',
+        '${_baseUrl}invitations/my/',
       );
 
       if (response.statusCode == 200) {
@@ -162,9 +196,9 @@ class GameService {
     required String action, // 'accept' or 'decline'
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse('${_baseUrl}invitations/$invitationId/respond/'),
-        headers: await _getAuthHeaders(),
+      final response = await _authenticatedRequest(
+        'POST',
+        '${_baseUrl}invitations/$invitationId/respond/',
         body: json.encode({
           'action': action,
         }),
@@ -194,9 +228,9 @@ class GameService {
     required int invitationId,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse('${_baseUrl}invitations/$invitationId/cancel/'),
-        headers: await _getAuthHeaders(),
+      final response = await _authenticatedRequest(
+        'POST',
+        '${_baseUrl}invitations/$invitationId/cancel/',
       );
 
       if (response.statusCode == 200) {
@@ -223,9 +257,9 @@ class GameService {
       print('📞 CALL SIGNAL: Sending to receiver: $receiverUsername');
       print('📞 CALL SIGNAL: Room ID: $roomId');
       
-      final response = await http.post(
-        Uri.parse('${_baseUrl}call/send/'),
-        headers: await _getAuthHeaders(),
+      final response = await _authenticatedRequest(
+        'POST',
+        '${_baseUrl}call/send/',
         body: json.encode({
           'receiver_username': receiverUsername,
           'room_id': roomId,
@@ -256,9 +290,9 @@ class GameService {
     try {
       print('📞 CALL DECLINE: Sending to caller: $callerUsername');
       
-      final response = await http.post(
-        Uri.parse('${_baseUrl}call/decline/'),
-        headers: await _getAuthHeaders(),
+      final response = await _authenticatedRequest(
+        'POST',
+        '${_baseUrl}call/decline/',
         body: json.encode({
           'caller_username': callerUsername,
           'room_id': roomId,
