@@ -50,8 +50,32 @@ class MqttService {
     if (response.payload != null) {
       try {
         final data = json.decode(response.payload!);
+        final payloadType = data['type'];
+
+        // Handle Game Invitation Actions
+        if (payloadType == 'game_invitation') {
+          if (response.actionId == 'decline') {
+            print('❌ User declined game from notification');
+            final invitationId = data['payload']['id'];
+            if (invitationId != null) {
+              GameService.respondToInvitation(
+                invitationId: invitationId,
+                action: 'decline',
+              ).then((_) => print('✅ Decline signal sent for game invite'));
+            }
+            return;
+          } else if (response.actionId == 'accept') {
+            print('✅ User accepted game from notification');
+            // Broadcast to open game directly
+            _notificationController.add({
+              ...data,
+              'action': 'accept',
+            });
+            return;
+          }
+        }
         
-        // Handle action button taps
+        // Handle Call Invitation Actions
         if (response.actionId == 'decline') {
           print('❌ User declined call from notification');
           
@@ -60,25 +84,14 @@ class MqttService {
             final caller = payloadMap['caller'];
             final roomId = payloadMap['room_id'];
             
-            print('❌ Processing decline for Caller: $caller, Room: $roomId');
-
             if (caller != null && roomId != null) {
                GameService.declineCall(
                   callerUsername: caller,
                   roomId: roomId,
                 ).then((_) => print('✅ Decline signal sent from notification'));
-            } else {
-              print('⚠️ Missing caller or room_id in payload for decline');
             }
           } catch (e) {
             print('⚠️ Error parsing payload for decline: $e');
-            // Fallback: try to extract from root if structure is different
-            if (data['caller'] != null) {
-               GameService.declineCall(
-                  callerUsername: data['caller'],
-                  roomId: data['room_id'],
-                );
-            }
           }
           
           cancelCallNotification();
@@ -200,7 +213,7 @@ class MqttService {
 
     if (type == 'game_invitation') {
       print('🔔 MQTT: Showing game invitation notification');
-      _showLocalNotification(
+      _showGameNotification(
         'New Challenge!',
         '${payload['sender']['username']} has challenged you to a game.',
         json.encode(data),
@@ -241,7 +254,7 @@ class MqttService {
     _notificationController.add(data);
   }
 
-  Future<void> _showLocalNotification(String title, String body, String payload) async {
+  Future<void> _showGameNotification(String title, String body, String payload) async {
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
       'chess_notifications_high',
@@ -253,11 +266,25 @@ class MqttService {
       fullScreenIntent: true,
       category: AndroidNotificationCategory.call,
       visibility: NotificationVisibility.public,
+      actions: <AndroidNotificationAction>[
+        AndroidNotificationAction(
+          'decline',
+          'Decline',
+          showsUserInterface: false,
+          cancelNotification: true,
+        ),
+        AndroidNotificationAction(
+          'accept',
+          'Accept',
+          showsUserInterface: true,
+          cancelNotification: true,
+        ),
+      ],
     );
     const NotificationDetails platformChannelSpecifics =
         NotificationDetails(android: androidPlatformChannelSpecifics);
     
-    // Use a unique ID based on timestamp to avoid overwriting previous notifications
+    // Use a unique ID based on timestamp
     final int notificationId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
 
     await flutterLocalNotificationsPlugin.show(
