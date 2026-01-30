@@ -38,11 +38,14 @@ class _CallScreenState extends State<CallScreen> {
     super.initState();
     print("📞 CallScreen: initState called");
     MqttService().setInCall(true); // Mark as in-call
-    // Only stop incoming ringtone if we are the Callee.
-    // If we are the Caller, the ringback tone (started in UserListScreen) should continue playing.
-    if (!widget.isCaller) {
-      MqttService().cancelCallNotification();
-    }
+    
+    // Stop all audio immediately upon entering CallScreen
+    MqttService().stopAudio().then((_) {
+      // For Callee, also cancel notification if still there
+      if (!widget.isCaller) {
+        MqttService().cancelCallNotification();
+      }
+    });
     _initRenderers();
     _connect();
     _listenForDecline();
@@ -79,8 +82,11 @@ class _CallScreenState extends State<CallScreen> {
       setState(() {});
     });
 
-    _signalingService.onPlayerJoined = () {
+    _signalingService.onPlayerJoined = () async {
       print("👋 Peer joined the room");
+      // Stop ringback tone as soon as someone joins
+      await MqttService().stopAudio();
+      
       if (widget.isCaller) {
         setState(() => _status = "Peer joined. Calling...");
         _startCall(); // Auto-start call when peer joins
@@ -112,7 +118,7 @@ class _CallScreenState extends State<CallScreen> {
       print("❌ Call ended by peer");
       if (mounted && !_isExiting) {
         // Stop audio if any (should already be stopped)
-        MqttService().stopAudio();
+        await MqttService().stopAudio();
         _handleCallEnd("Call Ended");
       }
     };
@@ -140,7 +146,7 @@ class _CallScreenState extends State<CallScreen> {
       );
 
       if (!result['success']) {
-        MqttService().stopAudio();
+        await MqttService().stopAudio();
         setState(() => _status = "Failed to call: ${result['error']}");
       }
     } else {

@@ -207,10 +207,9 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
           _showIncomingCallDialog(payload);
         }
       } else if (type == 'game_invitation') {
-        if (action == 'accept') {
            print('🎮 Auto-accepting game from notification');
            // Stop listening to ringtone if any
-           MqttService().cancelCallNotification();
+           await MqttService().cancelCallNotification();
            
            final invitationId = payload['id'];
            final roomId = payload['room_id'];
@@ -301,9 +300,9 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
         ),
         actions: [
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               _isDialogShowing = false;
-              MqttService().cancelCallNotification();
+              await MqttService().cancelCallNotification();
               Navigator.of(dialogContext).pop();
               
               // Send decline signal to caller
@@ -315,9 +314,9 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
             child: const Text('Decline', style: TextStyle(color: Colors.red)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               _isDialogShowing = false;
-              MqttService().cancelCallNotification();
+              await MqttService().cancelCallNotification();
               Navigator.of(dialogContext).pop();
               // Navigate to call screen as Callee (isCaller=false)
               try {

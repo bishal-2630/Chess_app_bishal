@@ -170,7 +170,7 @@ class MqttService {
             print('⚠️ Error parsing payload for decline: $e');
           }
           
-          cancelCallNotification();
+          await cancelCallNotification();
           return;
         } else if (response.actionId == 'accept') {
           print('✅ User accepted call from notification');
@@ -523,10 +523,11 @@ class MqttService {
 
   Future<void> stopAudio() async {
     try {
-      print('MQTT: Stopping audio...');
+      print('MQTT: Stopping audio aggressively...');
       await _audioPlayer.stop();
+      await _audioPlayer.release(); // Force release resources and silence
       _isPlaying = false;
-      print('MQTT: Audio stopped.');
+      print('MQTT: Audio stopped and released.');
     } catch (e) {
       print('MQTT: Error stopping audio: $e');
     }

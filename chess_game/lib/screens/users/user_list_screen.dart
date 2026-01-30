@@ -57,11 +57,10 @@ class _UserListScreenState extends State<UserListScreen> {
     }
   }
 
-  @override
-  void dispose() {
     _challengeTimer?.cancel();
+    // In case user leaves list screen while calling tone is playing
+    MqttService().stopAudio();
     super.dispose();
-  }
 
   List<dynamic> get _filteredUsers {
     final users = _allUsers;
