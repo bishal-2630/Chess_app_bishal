@@ -8,6 +8,7 @@ import 'dart:ui';
 import 'dart:isolate';
 import 'game_service.dart';
 import 'django_auth_service.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse response) async {
@@ -15,6 +16,11 @@ void notificationTapBackground(NotificationResponse response) async {
   
   try {
     // 1. STOP AUDIO IMMEDIATELY (Prioritize UX)
+    // Using robust service.invoke instead of legacy ports
+    FlutterBackgroundService().invoke('stopAudio');
+    FlutterBackgroundService().invoke('dismissCall');
+    
+    // Legacy support for ports if needed, but invoke is preferred
     for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
       final SendPort? sendPort = IsolateNameServer.lookupPortByName(portName);
       if (sendPort != null) {
@@ -555,6 +561,7 @@ class MqttService {
       await _audioPlayer.stop();
       await _audioPlayer.release(); // Force release resources
       _isPlaying = false;
+      _currentCallRoomId = null; // Important: Clear room ID when stopping
       print('MQTT [$isolateName]: Local audio stopped.');
     } catch (e) {
       print('MQTT [$isolateName]: Error stopping local audio: $e');
@@ -562,6 +569,12 @@ class MqttService {
 
     if (broadcast) {
       print('MQTT [$isolateName]: Broadcasting stop_audio signal...');
+      
+      // NEW: Robust service-based signaling
+      FlutterBackgroundService().invoke('stopAudio');
+      FlutterBackgroundService().invoke('dismissCall'); // Tell other isolates to close dialogs
+
+      // LEGACY: IsolateNameServer-based signaling
       for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
         final SendPort? sendPort = IsolateNameServer.lookupPortByName(portName);
         if (sendPort != null) {

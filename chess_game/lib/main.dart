@@ -151,6 +151,31 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
     _handleInitialNotification();
     _listenForNotifications();
     _checkInitialAuth();
+    _setupServiceSignals();
+  }
+
+  void _setupServiceSignals() {
+    final service = FlutterBackgroundService();
+    
+    // Listen for stopAudio from other isolates
+    service.on('stopAudio').listen((event) {
+      print('Main Isolate UI: Received stopAudio signal from service.invoke');
+      MqttService().stopAudio(broadcast: false);
+    });
+    
+    // Listen for dismissCall from other isolates
+    service.on('dismissCall').listen((event) {
+      print('Main Isolate UI: Received dismissCall signal from service.invoke');
+      _dismissCurrentDialog();
+    });
+  }
+
+  void _dismissCurrentDialog() {
+    if (_isDialogShowing && mounted) {
+      print('Main Isolate UI: Closing current call dialog');
+      Navigator.of(context, rootNavigator: true).pop();
+      _isDialogShowing = false;
+    }
   }
 
   Future<void> _handleInitialNotification() async {
@@ -229,7 +254,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
         }
 
         // Cleanup in background without awaiting
-        MqttService().stopAudio();
+        MqttService().stopAudio(broadcast: true);
         MqttService().cancelCallNotification();
 
         final caller = payload['caller'];
@@ -257,7 +282,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
         context.go('/chess?roomId=$roomId&color=b');
 
         // Cleanup in background
-        MqttService().stopAudio();
+        MqttService().stopAudio(broadcast: true);
         MqttService().cancelCallNotification();
         
         final invitationId = payload['id'];
@@ -307,10 +332,14 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
 
   void _showIncomingCallDialog(Map<String, dynamic> callData) {
     if (!mounted) return;
-    if (_isDialogShowing) return; // Don't show if already showing
-
-    final caller = callData['caller'];
+    
     final roomId = callData['room_id'];
+    final caller = callData['caller'];
+
+    if (_isDialogShowing) {
+      print('📞 UI: Incoming call dialog already showing, skipping duplicate.');
+      return;
+    }
     
     _isDialogShowing = true; // Set to true when showing
 
