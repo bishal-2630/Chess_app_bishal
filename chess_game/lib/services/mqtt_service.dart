@@ -533,13 +533,14 @@ class MqttService {
       _isPlaying = true;
       print('MQTT [$isolateName]: Playing sound $fileName');
       
-      // Ensure volume is up (it might have been set to 0 by stopAudio)
-      await _audioPlayer.setVolume(1.0);
-      
       // Reset player mode just in case
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
       // The path should be relative to the assets folder, e.g., 'sounds/ringtone.mp3'
       await _audioPlayer.play(AssetSource(fileName));
+      
+      // Ensure volume is up (it might have been set to 0 by stopAudio)
+      // Call this after play to ensure the player is in an active state
+      await _audioPlayer.setVolume(1.0);
     } catch (e) {
       print('MQTT [$isolateName]: Error playing sound $fileName: $e');
       _isPlaying = false;

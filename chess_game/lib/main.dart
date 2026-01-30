@@ -211,10 +211,13 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
     print('🔔 Processing $type (action: $action)');
 
     if (type == 'call_ended' || type == 'call_declined' || type == 'call_cancelled') {
-      print('📞 Call dismissing event received: $type');
+      print('📞 Call dismissing event received: $type. isDialogShowing: $_isDialogShowing');
       if (_isDialogShowing) {
+        print('📞 Popping dialog...');
         Navigator.of(context).pop();
         _isDialogShowing = false;
+      } else {
+        print('📞 Dialog suppression: No dialog was active to pop.');
       }
     } else if (type == 'call_invitation') {
       if (action == 'accept') {
@@ -273,6 +276,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
   }
 
   void _handleInvitationResponse(Map<String, dynamic> data) {
+    print('IncomingCallWrapper: _handleInvitationResponse called with data: $data');
     final action = data['action'];
     final invitation = data['invitation'];
     final receiver = invitation['receiver']['username'];
