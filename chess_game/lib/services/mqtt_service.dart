@@ -24,6 +24,7 @@ class MqttService {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
   String? _currentCallRoomId;
+  final Set<String> _declinedRoomIds = {};
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -205,12 +206,26 @@ class MqttService {
         json.encode(data),
       );
     } else if (type == 'call_invitation') {
+      final roomId = payload['room_id'];
+      
+      // Check if we already suspended/declined this call
+      if (_declinedRoomIds.contains(roomId)) {
+        print('🚫 MQTT: Ignoring call invitation for declined room: $roomId');
+        return;
+      }
+      
+      // Check if we are already ringing for this exact room
+      if (_isPlaying && _currentCallRoomId == roomId) {
+        print('⚠️ MQTT: Already ringing for room $roomId, skipping duplicate notification');
+        return;
+      }
+
       print('🔔 MQTT: Showing call invitation notification');
-      _currentCallRoomId = payload['room_id'];
+      _currentCallRoomId = roomId;
       playSound('sounds/ringtone.mp3');
       _showCallNotification(
         '${payload['caller']}',
-        payload['room_id'],
+        roomId,
         json.encode(data),
       );
     } else if (type == 'call_declined') {
@@ -324,6 +339,23 @@ class MqttService {
   Future<void> cancelCallNotification() async {
     const int callNotificationId = 999;
     await flutterLocalNotificationsPlugin.cancel(callNotificationId);
+    
+    // Add current room to declined set so we don't ring again for it
+    if (_currentCallRoomId != null) {
+      final roomId = _currentCallRoomId!;
+      _declinedRoomIds.add(roomId);
+      print('🚫 MQTT: Added $roomId to declined list');
+      
+      // Auto-clear after 1 minute to keep set size small
+      // We use the captured 'roomId' variable, not the field which becomes null
+      Future.delayed(const Duration(minutes: 1), () {
+        _declinedRoomIds.remove(roomId);
+        print('🚫 MQTT: Removed $roomId from declined list (expired)');
+      });
+      
+      _currentCallRoomId = null;
+    }
+    
     await stopAudio();
     
     // Broadcast clean up event to close any open dialogs

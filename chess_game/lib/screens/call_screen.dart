@@ -58,28 +58,35 @@ class _CallScreenState extends State<CallScreen> {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: const Text('Call Declined'),
-            content: Text('$decliner declined the call.'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop(); // Close dialog
-                  if (mounted) Navigator.of(context).pop(); // Close CallScreen
-                },
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-        
-        // Auto-close after 2 seconds
-        Future.delayed(const Duration(seconds: 2), () {
+          builder: (dialogContext) {
+            // Auto-close dialog after 2 seconds
+            Future.delayed(const Duration(seconds: 2), () {
+              // Use 'context' (CallScreen context) which is stable if mounted.
+              // If dialog is closed, mounted is false (because we popped screen in .then).
+              // If dialog is open, mounted is true, and pop() closes the dialog.
+              if (mounted) {
+                 Navigator.of(context).pop(); 
+              }
+            });
+            
+            return AlertDialog(
+              title: const Text('Call Declined'),
+              content: Text('$decliner declined the call.'),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    // Close dialog immediately
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        ).then((_) {
+          // Once dialog is closed (by user or timer), close the screen
           if (mounted) {
-             // Close dialog
-             Navigator.of(context).pop(); 
-             // Close screen
-             if (mounted) Navigator.of(context).pop();
+             Navigator.of(context).pop();
           }
         });
       }
