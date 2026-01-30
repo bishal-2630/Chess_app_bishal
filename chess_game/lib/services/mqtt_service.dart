@@ -18,8 +18,10 @@ void notificationTapBackground(NotificationResponse response) async {
     for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
       final SendPort? sendPort = IsolateNameServer.lookupPortByName(portName);
       if (sendPort != null) {
-        print('🔔 Signaling stop_audio to $portName');
+        print('🔔 Background Task: Signaling stop_audio to $portName');
         sendPort.send('stop_audio');
+      } else {
+        print('⚠️ Background Task: Could not find port $portName');
       }
     }
 
@@ -130,10 +132,10 @@ class MqttService {
     IsolateNameServer.registerPortWithName(_listenerPort.sendPort, portName);
     
     _listenerPort.listen((message) async {
-      print("🔔 $portName received: $message");
+      print("🔔 [$portName] Isolate received: $message");
       if (message == 'stop_audio') {
-        print("🔔 STOPPING AUDIO in isolate via $portName");
-        await stopAudio();
+        print("🔔 [$portName] EXECUTING LOCAL STOP");
+        await stopAudio(broadcast: false); // Stop local audio only
       }
     });
   }
@@ -533,20 +535,24 @@ class MqttService {
   }
 
   Future<void> stopAudio({bool broadcast = false}) async {
+    final isolateName = Isolate.current.debugName ?? 'unknown';
     try {
-      print('MQTT: Stopping audio locally...');
+      print('MQTT [$isolateName]: Stopping audio locally...');
+      await _audioPlayer.setVolume(0); // Silence first
       await _audioPlayer.stop();
-      await _audioPlayer.release(); // Force release resources and silence
+      await _audioPlayer.release(); // Force release resources
       _isPlaying = false;
+      print('MQTT [$isolateName]: Local audio stopped.');
     } catch (e) {
-      print('MQTT: Error stopping audio: $e');
+      print('MQTT [$isolateName]: Error stopping local audio: $e');
     }
 
     if (broadcast) {
-      print('MQTT: Broadcasting stop_audio to all isolates');
+      print('MQTT [$isolateName]: Broadcasting stop_audio signal...');
       for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
         final SendPort? sendPort = IsolateNameServer.lookupPortByName(portName);
         if (sendPort != null) {
+          print('MQTT [$isolateName]: Sending to $portName');
           sendPort.send('stop_audio');
         }
       }

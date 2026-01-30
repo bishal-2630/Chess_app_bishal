@@ -59,14 +59,16 @@ class BackgroundServiceInstance {
     final authService = DjangoAuthService();
     await authService.initialize(); // Load from prefs
 
+    // Always register port immediately on start so it can receive stop signals
+    final mqttService = MqttService();
+    mqttService.initializeIsolateListener(isBackground: true);
+
     if (authService.isLoggedIn) {
       final username = authService.currentUser?['username'];
       if (username != null) {
         print(
             'Background Service: User logged in, connecting MQTT for $username');
-        final mqttService = MqttService();
         await mqttService.initialize();
-        mqttService.initializeIsolateListener(isBackground: true);
         await mqttService.connect(username);
       }
     }
@@ -86,10 +88,11 @@ class BackgroundServiceInstance {
       // Check connection occasionally
       final authService = DjangoAuthService();
       if (authService.isLoggedIn) {
-        final mqtt = MqttService();
         if (!mqtt.isConnected) {
           final username = authService.currentUser?['username'];
           if (username != null) {
+            // Ensure port is registered even if service restarted/woke up
+            mqtt.initializeIsolateListener(isBackground: true);
             await mqtt.connect(username);
           }
         }
