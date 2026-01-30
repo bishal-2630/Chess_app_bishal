@@ -485,11 +485,10 @@ class MqttService {
         _declinedRoomIds.remove(roomId);
         print('🚫 MQTT: Removed $roomId from declined list (expired)');
       });
-      
       _currentCallRoomId = null;
     }
     
-    stopAudio();
+    stopAudio(broadcast: true);
   }
   
   void setInCall(bool inCall) {
@@ -533,15 +532,24 @@ class MqttService {
     }
   }
 
-  Future<void> stopAudio() async {
+  Future<void> stopAudio({bool broadcast = false}) async {
     try {
-      print('MQTT: Stopping audio aggressively...');
+      print('MQTT: Stopping audio locally...');
       await _audioPlayer.stop();
       await _audioPlayer.release(); // Force release resources and silence
       _isPlaying = false;
-      print('MQTT: Audio stopped and released.');
     } catch (e) {
       print('MQTT: Error stopping audio: $e');
+    }
+
+    if (broadcast) {
+      print('MQTT: Broadcasting stop_audio to all isolates');
+      for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
+        final SendPort? sendPort = IsolateNameServer.lookupPortByName(portName);
+        if (sendPort != null) {
+          sendPort.send('stop_audio');
+        }
+      }
     }
   }
 

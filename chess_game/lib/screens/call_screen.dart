@@ -61,7 +61,7 @@ class _CallScreenState extends State<CallScreen> {
         print("❌ Call declined by $decliner");
         
         // Stop audio (ringback tone)
-        MqttService().stopAudio();
+        MqttService().stopAudio(broadcast: true);
         
         _handleCallEnd("Call Declined");
       }
@@ -107,7 +107,7 @@ class _CallScreenState extends State<CallScreen> {
 
     _signalingService.onCallAccepted = () async {
       print("✅ Call accepted by peer");
-      await MqttService().stopAudio();
+      await MqttService().stopAudio(broadcast: true);
       setState(() {
         _inCall = true;
         _status = "Connected";
@@ -167,7 +167,7 @@ class _CallScreenState extends State<CallScreen> {
     _isExiting = true;
     
     // Ensure audio is stopped and in-call state cleared
-    MqttService().stopAudio();
+    MqttService().stopAudio(broadcast: true);
     MqttService().setInCall(false);
     
     if (mounted) {
@@ -192,7 +192,7 @@ class _CallScreenState extends State<CallScreen> {
     _localRenderer.dispose();
     _remoteRenderer.dispose();
     _signalingService.hangUp();
-    MqttService().stopAudio();
+    MqttService().stopAudio(broadcast: true);
     super.dispose();
   }
 
