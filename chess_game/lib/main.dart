@@ -180,7 +180,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
   }
 
   void _listenForNotifications() {
-    MqttService().notifications.listen((data) {
+    MqttService().notifications.listen((data) async {
       if (!mounted) return;
 
       final type = data['type'];
