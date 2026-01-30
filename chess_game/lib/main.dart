@@ -157,12 +157,8 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
     final details = await MqttService().flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails();
     if (details != null && details.didNotificationLaunchApp && details.notificationResponse != null) {
       print('🚀 App launched via notification action: ${details.notificationResponse?.actionId}');
-      // Delay slightly to ensure navigation is ready
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) {
-          MqttService().onNotificationTapped(details.notificationResponse!);
-        }
-      });
+      // Immediately pass to MqttService to buffer it
+      MqttService().onNotificationTapped(details.notificationResponse!);
     }
   }
 
@@ -182,78 +178,102 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
   }
 
   void _listenForNotifications() {
-    MqttService().notifications.listen((data) async {
-      if (!mounted) return;
+    print('🔔 Setting up notification listener...');
+    final mqtt = MqttService();
+    
+    mqtt.notifications.listen((data) {
+      print('🔔 Received notification event in main isolate: $data');
+      _processNotificationData(data);
+    });
 
-      final type = data['type'];
-      final payload = data['data'] ?? data['payload'];
-      final action = data['action']; // Check if this came from a notification action
+    // Check for buffered event (e.g., from cold launch)
+    if (mqtt.lastNotificationEvent != null) {
+      print('🚀 Processing buffered startup notification');
+      final event = mqtt.lastNotificationEvent!;
+      mqtt.clearLastNotification();
+      
+      // Small delay to ensure GoRouter is fully ready
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) _processNotificationData(event);
+      });
+    }
+  }
 
-      if (type == 'call_ended') {
-        print('📞 Call ended event received');
+  void _processNotificationData(Map<String, dynamic> data) async {
+    if (!mounted) return;
+
+    final type = data['type'];
+    final action = data['action'];
+    final payload = data['data'] ?? data['payload'];
+
+    print('🔔 Processing $type (action: $action)');
+
+    if (type == 'call_ended') {
+      print('📞 Call ended event received');
+      if (_isDialogShowing) {
+        Navigator.of(context).pop();
+        _isDialogShowing = false;
+      }
+    } else if (type == 'call_invitation') {
+      if (action == 'accept') {
+        print('📞 Auto-accepting call from notification stream');
+        
         if (_isDialogShowing) {
-          Navigator.of(context).pop(); // Close dialog
+           Navigator.of(context).pop();
+           _isDialogShowing = false;
+        }
+
+        await MqttService().stopAudio();
+        await MqttService().cancelCallNotification();
+
+        final caller = payload['caller'];
+        final roomId = payload['room_id'];
+        try {
+          context.go('/call?roomId=$roomId&otherUserName=$caller&isCaller=false');
+        } catch (e) {
+          print("Navigation failed: $e");
+        }
+      } else {
+        _showIncomingCallDialog(payload);
+      }
+    } else if (type == 'game_invitation') {
+      if (action == 'accept') {
+        print('🎮 Auto-accepting game invite from notification stream');
+        
+        if (_isDialogShowing) {
+          Navigator.of(context).pop();
           _isDialogShowing = false;
         }
-      } else if (type == 'call_invitation') {
-        // If user tapped Accept on notification, go directly to call screen
-        if (action == 'accept') {
-          print('📞 Auto-accepting call from notification');
-          
-          if (_isDialogShowing) {
-             Navigator.of(context).pop();
-             _isDialogShowing = false;
-          }
-          
-          // Force stop audio before navigation
-          await MqttService().stopAudio();
-          await MqttService().cancelCallNotification();
-          
-          final caller = payload['caller'];
-          final roomId = payload['room_id'];
-          try {
-            GoRouter.of(context).push(
-                '/call?roomId=$roomId&otherUserName=$caller&isCaller=false');
-          } catch (e) {
-            print("Navigation failed: $e");
-          }
-        } else {
-          // Show dialog for normal MQTT notification
-          _showIncomingCallDialog(payload);
-        }
-      } else if (type == 'game_invitation') {
-        if (action == 'accept') {
-          print('🎮 Auto-accepting game from notification');
-          // Stop listening to ringtone if any
-          await MqttService().cancelCallNotification();
 
-          final invitationId = payload['id'];
-          final roomId = payload['room_id'];
-
-          if (invitationId != null) {
-            GameService.respondToInvitation(
-              invitationId: invitationId,
-              action: 'accept',
-            ).then((result) {
-              if (result['success']) {
-                print('✅ Successfully accepted game invite via notification');
-                try {
-                  context.go('/chess?roomId=$roomId&color=b');
-                } catch (e) {
-                  print("Navigation failed: $e");
-                }
-              } else {
-                print('❌ Failed to accept game invite: ${result['error']}');
-              }
-            });
+        await MqttService().stopAudio();
+        await MqttService().cancelCallNotification();
+        
+        final invitationId = payload['id'];
+        final roomId = payload['room_id'];
+        
+        if (invitationId != null) {
+          final result = await GameService.respondToInvitation(
+            invitationId: invitationId,
+            action: 'accept',
+          );
+          
+          if (result['success']) {
+            print('✅ Successfully accepted game invite via notification');
+            try {
+              context.go('/chess?roomId=$roomId&color=b');
+            } catch (e) {
+              print("Navigation failed: $e");
+            }
+          } else {
+            print('❌ Failed to accept game invite: ${result['error']}');
           }
-        } else {
-          _showGameInvitationDialog(payload);
         }
-      } else if (type == 'invitation_response') {
-        _handleInvitationResponse(payload);
+      } else {
+        _showGameInvitationDialog(payload);
       }
-    });
+    } else if (type == 'invitation_response') {
+      _handleInvitationResponse(payload);
+    }
   }
 
   void _handleInvitationResponse(Map<String, dynamic> data) {

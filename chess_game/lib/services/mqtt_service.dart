@@ -30,32 +30,39 @@ void notificationTapBackground(NotificationResponse response) async {
   // 2. Initialize services needed for API calls
   await DjangoAuthService().initialize(autoConnectMqtt: false);
   
-  if (response.payload != null && response.actionId == 'decline') {
-    try {
-      final data = json.decode(response.payload!);
-      final type = data['type'];
-      print('🔔 Background: Action type decoded: $type');
-      
-      if (type == 'call_invitation') {
-        final payload = data['payload'];
-        final caller = payload['caller'];
-        final roomId = payload['room_id'];
-        print('❌ Background: Sending decline signal to caller $caller for room $roomId');
-        if (caller != null && roomId != null) {
-          await GameService.declineCall(callerUsername: caller, roomId: roomId);
-          print('✅ Background: Decline signal sent successfully');
+  if (response.payload != null) {
+    if (response.actionId == 'accept') {
+       print('🔔 Background: Accept tapped. Letting OS launch app...');
+       return; // Body tap or Accept should launch app, no background signaling needed
+    }
+
+    if (response.actionId == 'decline') {
+      try {
+        final data = json.decode(response.payload!);
+        final type = data['type'];
+        print('🔔 Background: Action type decoded: $type');
+        
+        if (type == 'call_invitation') {
+          final payload = data['payload'];
+          final caller = payload['caller'];
+          final roomId = payload['room_id'];
+          print('❌ Background: Sending decline signal to caller $caller for room $roomId');
+          if (caller != null && roomId != null) {
+            await GameService.declineCall(callerUsername: caller, roomId: roomId);
+            print('✅ Background: Decline signal sent successfully');
+          }
+        } else if (type == 'game_invitation') {
+          final payload = data['payload'];
+          final invitationId = payload['id'];
+          print('❌ Background: Sending decline response for game invite $invitationId');
+          if (invitationId != null) {
+            await GameService.respondToInvitation(invitationId: invitationId, action: 'decline');
+            print('✅ Background: Game invitation declined successfully');
+          }
         }
-      } else if (type == 'game_invitation') {
-        final payload = data['payload'];
-        final invitationId = payload['id'];
-        print('❌ Background: Sending decline response for game invite $invitationId');
-        if (invitationId != null) {
-          await GameService.respondToInvitation(invitationId: invitationId, action: 'decline');
-          print('✅ Background: Game invitation declined successfully');
-        }
+      } catch (e) {
+        print('❌ Background Isolate Business Logic Error: $e');
       }
-    } catch (e) {
-      print('❌ Background Isolate Business Logic Error: $e');
     }
   }
 }
@@ -77,6 +84,17 @@ class MqttService {
   final StreamController<Map<String, dynamic>> _notificationController = 
       StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get notifications => _notificationController.stream;
+
+  // Buffer for the last notification event to solve race conditions on startup
+  Map<String, dynamic>? _lastNotificationEvent;
+  Map<String, dynamic>? get lastNotificationEvent => _lastNotificationEvent;
+
+  void clearLastNotification() => _lastNotificationEvent = null;
+
+  void _emitNotification(Map<String, dynamic> data) {
+    _lastNotificationEvent = data;
+    _notificationController.add(data);
+  }
 
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
@@ -145,8 +163,7 @@ class MqttService {
             return;
           } else if (response.actionId == 'accept') {
             print('✅ User accepted game from notification');
-            // Broadcast to open game directly
-            _notificationController.add({
+            _emitNotification({
               ...data,
               'action': 'accept',
             });
@@ -187,16 +204,16 @@ class MqttService {
           await cancelCallNotification();
           
           // Broadcast to open call screen
-          _notificationController.add({
+          _emitNotification({
             ...data,
             'action': 'accept',
           });
           return;
         }
         
-        // Handle regular notification tap (no action button)
+        // Handle regular notification tap (no action body)
         print('👆 User tapped notification body');
-        _notificationController.add(data);
+        _emitNotification(data);
       } catch (e) {
         print('Error parsing notification payload: $e');
       }
@@ -291,7 +308,7 @@ class MqttService {
     });
   }
 
-  void _handleNotification(Map<String, dynamic> data) {
+  Future<void> _handleNotification(Map<String, dynamic> data) async {
     print('🔔 MQTT: _handleNotification called with data: $data');
     final type = data['type'];
     final payload = data['payload'];
@@ -334,10 +351,10 @@ class MqttService {
         roomId,
         json.encode(data),
       );
+      print('✅ MQTT: Call notification sent to system');
     } else if (type == 'call_declined') {
-      print('🔔 MQTT: Call declined by user');
-      // If we are currently calling this room/user, we should notify listeners
-      cancelCallNotification(); // Stop ringtone if we were ringing
+      print('🔔 MQTT: Call declined by user via signaling');
+      await cancelCallNotification(); // Stop ringtone if we were ringing
       // Broadcast to listeners (CallScreen will pick this up)
       _notificationController.add(data);
     }
@@ -377,11 +394,11 @@ class MqttService {
     const NotificationDetails platformChannelSpecifics =
         NotificationDetails(android: androidPlatformChannelSpecifics);
     
-    // Use a unique ID based on timestamp
-    final int notificationId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
+    // Use a fixed ID for game notifications so they are manageable
+    const int gameNotificationId = 888;
 
     await flutterLocalNotificationsPlugin.show(
-      notificationId,
+      gameNotificationId,
       title,
       body,
       platformChannelSpecifics,
