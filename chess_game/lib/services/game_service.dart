@@ -254,8 +254,8 @@ class GameService {
     required String roomId,
   }) async {
     try {
-      print('📞 CALL SIGNAL: Sending to receiver: $receiverUsername');
-      print('📞 CALL SIGNAL: Room ID: $roomId');
+      print('📞 [DEBUG] CALL SIGNAL: Sending to receiver: $receiverUsername');
+      print('📞 [DEBUG] CALL SIGNAL: URL: ${_baseUrl}call/send/');
       
       final response = await _authenticatedRequest(
         'POST',
@@ -266,14 +266,14 @@ class GameService {
         }),
       );
 
-      print('📞 CALL SIGNAL: Response status: ${response.statusCode}');
-      print('📞 CALL SIGNAL: Response body: ${response.body}');
+      print('📞 [DEBUG] CALL SIGNAL: Status: ${response.statusCode}');
+      print('📞 [DEBUG] CALL SIGNAL: Body: ${response.body}');
 
       if (response.statusCode == 200) {
-        print('✅ CALL SIGNAL: Successfully sent to $receiverUsername');
+        print('✅ [DEBUG] CALL SIGNAL: Successfully sent to $receiverUsername');
         return {'success': true};
       } else {
-        print('❌ CALL SIGNAL: Failed with status ${response.statusCode}');
+        print('❌ [DEBUG] CALL SIGNAL: Failed');
         return {'success': false, 'error': 'Failed to send call signal'};
       }
     } catch (e) {
@@ -288,7 +288,8 @@ class GameService {
     required String roomId,
   }) async {
     try {
-      print('📞 CALL DECLINE: Sending to caller: $callerUsername');
+      print('📞 [DEBUG] CALL DECLINE: Sending to caller: $callerUsername');
+      print('📞 [DEBUG] CALL DECLINE: URL: ${_baseUrl}call/decline/');
       
       final response = await _authenticatedRequest(
         'POST',
@@ -299,11 +300,12 @@ class GameService {
         }),
       );
 
+      print('📞 [DEBUG] CALL DECLINE: Status: ${response.statusCode}');
       if (response.statusCode == 200) {
-        print('✅ CALL DECLINE: Successfully sent to $callerUsername');
+        print('✅ [DEBUG] CALL DECLINE: Successfully sent to $callerUsername');
         return {'success': true};
       } else {
-        print('❌ CALL DECLINE: Failed with status ${response.statusCode}');
+        print('❌ [DEBUG] CALL DECLINE: Failed: ${response.body}');
         return {'success': false, 'error': 'Failed to decline call'};
       }
     } catch (e) {

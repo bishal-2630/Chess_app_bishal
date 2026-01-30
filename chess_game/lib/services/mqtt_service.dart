@@ -11,59 +11,66 @@ import 'django_auth_service.dart';
 
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse response) async {
-  print('🔔 Background Notification tapped: ${response.actionId}');
+  print('🔔 BACKGROUND: Notification tapped. Action: ${response.actionId}');
   
-  // 1. STOP AUDIO IMMEDIATELY (Prioritize UX)
-  // Try signaling both main and background service isolates
   try {
+    // 1. STOP AUDIO IMMEDIATELY (Prioritize UX)
     for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
       final SendPort? sendPort = IsolateNameServer.lookupPortByName(portName);
       if (sendPort != null) {
-        print('🔔 Background: Sending stop_audio signal to $portName');
+        print('🔔 BACKGROUND: Sending stop_audio to $portName');
         sendPort.send('stop_audio');
       }
     }
-  } catch (e) {
-    print('❌ Background Isolate Signaling Error: $e');
-  }
 
-  // 2. Initialize services needed for API calls
-  await DjangoAuthService().initialize(autoConnectMqtt: false);
-  
-  if (response.payload != null) {
-    if (response.actionId == 'accept') {
-       print('🔔 Background: Accept tapped. Letting OS launch app...');
-       return; // Body tap or Accept should launch app, no background signaling needed
-    }
+    // 2. Initialize services
+    print('🔔 BACKGROUND: Initializing DjangoAuthService...');
+    await DjangoAuthService().initialize(autoConnectMqtt: false);
+    
+    if (response.payload != null) {
+      final data = json.decode(response.payload!);
+      final type = data['type'];
+      print('🔔 BACKGROUND: Type: $type, Action: ${response.actionId}');
 
-    if (response.actionId == 'decline') {
-      try {
-        final data = json.decode(response.payload!);
-        final type = data['type'];
-        print('🔔 Background: Action type decoded: $type');
-        
+      if (response.actionId == 'accept') {
+        print('🔔 BACKGROUND: Accept tapped. App should be launching...');
+        // The OS handles launching the app because showsUserInterface is true.
+        // We just return here to avoid race conditions.
+        return;
+      }
+
+      if (response.actionId == 'decline') {
         if (type == 'call_invitation') {
           final payload = data['payload'];
           final caller = payload['caller'];
           final roomId = payload['room_id'];
-          print('❌ Background: Sending decline signal to caller $caller for room $roomId');
           if (caller != null && roomId != null) {
+            print('🔔 BACKGROUND: Declining call from $caller');
             await GameService.declineCall(callerUsername: caller, roomId: roomId);
-            print('✅ Background: Decline signal sent successfully');
+            print('🔔 BACKGROUND: Call decline signal sent');
           }
         } else if (type == 'game_invitation') {
           final payload = data['payload'];
           final invitationId = payload['id'];
-          print('❌ Background: Sending decline response for game invite $invitationId');
           if (invitationId != null) {
+            print('🔔 BACKGROUND: Declining game invite $invitationId');
             await GameService.respondToInvitation(invitationId: invitationId, action: 'decline');
-            print('✅ Background: Game invitation declined successfully');
+            print('🔔 BACKGROUND: Game invite decline sent');
           }
         }
-      } catch (e) {
-        print('❌ Background Isolate Business Logic Error: $e');
       }
     }
+    
+    // 3. Manual cancel since we removed cancelNotification: true
+    if (response.notificationId != null) {
+      print('🔔 BACKGROUND: Manually canceling notification ${response.notificationId}');
+      final fln = FlutterLocalNotificationsPlugin();
+      await fln.cancel(response.notificationId!);
+    }
+
+  } catch (e, stack) {
+    print('❌ BACKGROUND ERROR: $e');
+    print('❌ BACKGROUND STACK: $stack');
   }
 }
 
@@ -381,13 +388,13 @@ class MqttService {
           'decline',
           'Decline',
           showsUserInterface: false,
-          cancelNotification: true,
+          cancelNotification: false, // Manual cancel
         ),
         AndroidNotificationAction(
           'accept',
           'Accept',
           showsUserInterface: true,
-          cancelNotification: true,
+          cancelNotification: false, // Manual cancel
         ),
       ],
     );
@@ -445,13 +452,13 @@ class MqttService {
           'decline',
           'Decline',
           showsUserInterface: false,
-          cancelNotification: true,
+          cancelNotification: false,
         ),
         const AndroidNotificationAction(
           'accept',
           'Accept',
           showsUserInterface: true,
-          cancelNotification: true,
+          cancelNotification: false,
         ),
       ],
     );

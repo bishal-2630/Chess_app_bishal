@@ -188,13 +188,18 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
 
     // Check for buffered event (e.g., from cold launch)
     if (mqtt.lastNotificationEvent != null) {
-      print('🚀 Processing buffered startup notification');
+      print('🚀 [DEBUG] Processing buffered startup notification (Cold Launch)');
       final event = mqtt.lastNotificationEvent!;
       mqtt.clearLastNotification();
       
-      // Small delay to ensure GoRouter is fully ready
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) _processNotificationData(event);
+      // Increased delay (1s) to ensure GoRouter and Page components are fully ready
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (mounted) {
+          print('🚀 [DEBUG] Executing buffered navigation after delay');
+          _processNotificationData(event);
+        } else {
+          print('⚠️ [DEBUG] Main widget unmounted during delay, skipping navigation');
+        }
       });
     }
   }
@@ -228,10 +233,11 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
 
         final caller = payload['caller'];
         final roomId = payload['room_id'];
+        print('📞 [DEBUG] Navigating to CallScreen for room $roomId with caller $caller');
         try {
           context.go('/call?roomId=$roomId&otherUserName=$caller&isCaller=false');
         } catch (e) {
-          print("Navigation failed: $e");
+          print("❌ [DEBUG] Navigation to CallScreen failed: $e");
         }
       } else {
         _showIncomingCallDialog(payload);
