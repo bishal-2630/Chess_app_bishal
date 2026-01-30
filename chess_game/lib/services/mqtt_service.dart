@@ -91,7 +91,7 @@ class MqttService {
     );
   }
 
-  void _onNotificationTapped(NotificationResponse response) {
+  void _onNotificationTapped(NotificationResponse response) async {
     print('🔔 Notification tapped: ${response.actionId}');
     print('🔔 Payload: ${response.payload}');
     
