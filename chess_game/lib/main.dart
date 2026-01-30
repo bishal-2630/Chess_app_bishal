@@ -17,6 +17,9 @@ import 'dart:async';
 import 'dart:isolate';
 import 'dart:ui';
 
+// Global port definition to prevent GC
+final ReceivePort _backgroundPort = ReceivePort();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -26,16 +29,12 @@ void main() async {
   final mqttService = MqttService();
   await mqttService.initialize();
 
-  // Initialize background service to keep MQTT alive when app is closed
-  // Temporarily disabled for testing
-  // await BackgroundServiceInstance.initializeService();
-
   // Setup Isolate communication for background audio stopping
-  final ReceivePort port = ReceivePort();
   IsolateNameServer.removePortNameMapping('chess_game_port');
-  IsolateNameServer.registerPortWithName(port.sendPort, 'chess_game_port');
+  var success = IsolateNameServer.registerPortWithName(_backgroundPort.sendPort, 'chess_game_port');
+  print('🔔 Port registration success: $success');
   
-  port.listen((message) async {
+  _backgroundPort.listen((message) async {
     print("🔔 Main Isolate received message: $message");
     if (message == 'stop_audio') {
       print("🔔 Stopping audio via Isolate signal");
@@ -197,13 +196,19 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
       } else if (type == 'call_invitation') {
         // If user tapped Accept on notification, go directly to call screen
         if (action == 'accept') {
+          print('📞 Auto-accepting call from notification');
+          
           if (_isDialogShowing) {
              Navigator.of(context).pop();
              _isDialogShowing = false;
           }
+          
+          // Force stop audio before navigation
+          await MqttService().stopAudio();
+          await MqttService().cancelCallNotification();
+          
           final caller = payload['caller'];
           final roomId = payload['room_id'];
-          print('📞 Auto-accepting call from notification');
           try {
             GoRouter.of(context).push(
                 '/call?roomId=$roomId&otherUserName=$caller&isCaller=false');
