@@ -16,8 +16,13 @@ void notificationTapBackground(NotificationResponse response) async {
   
   try {
     // 1. STOP AUDIO IMMEDIATELY (Prioritize UX)
+    final data = response.payload != null ? json.decode(response.payload!) : null;
+    final roomId = data != null && data['payload'] != null ? data['payload']['room_id'] : null;
+    
+    print('🔔 Background Task: Signaling stop_audio for room: $roomId');
+    
     // Using robust service.invoke instead of legacy ports
-    FlutterBackgroundService().invoke('stopAudio');
+    FlutterBackgroundService().invoke('stopAudio', {'roomId': roomId});
     FlutterBackgroundService().invoke('dismissCall');
     
     // Legacy support for ports if needed, but invoke is preferred
@@ -384,8 +389,21 @@ class MqttService {
       );
       print('✅ MQTT: Call notification sent to system');
     } else if (type == 'call_declined' || type == 'call_cancelled') {
-      print('🔔 MQTT: Call $type by user via signaling');
-      cancelCallNotification(); // Stop ringtone
+      final String? roomId = payload != null ? payload['room_id'] : null;
+      print('🔔 MQTT: Remote termination: $type for room: $roomId');
+      
+      if (roomId != null) {
+        ignoreRoom(roomId);
+        // If it's the current call, cancel notification and stop audio
+        if (_currentCallRoomId == roomId) {
+          cancelCallNotification();
+        } else {
+          // Just broadcast stop audio for this room anyway to be safe
+          stopAudio(broadcast: true, roomId: roomId);
+        }
+      } else {
+        cancelCallNotification(); // Fallback to current
+      }
     }
     
     print('🔔 MQTT: Broadcasting event type: $type');
@@ -500,6 +518,8 @@ class MqttService {
     const int callNotificationId = 999;
     await flutterLocalNotificationsPlugin.cancel(callNotificationId);
     
+    final String? roomIdToStop = _currentCallRoomId;
+    
     // Add current room to declined set so we don't ring again for it
     if (_currentCallRoomId != null) {
       final roomId = _currentCallRoomId!;
@@ -515,7 +535,7 @@ class MqttService {
       _currentCallRoomId = null;
     }
     
-    stopAudio(broadcast: true, roomId: _currentCallRoomId);
+    stopAudio(broadcast: true, roomId: roomIdToStop);
   }
   
   void setInCall(bool inCall) {
