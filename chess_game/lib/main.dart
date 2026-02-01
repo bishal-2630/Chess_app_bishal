@@ -373,17 +373,19 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
         ),
         actions: [
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               print('📞 UI: Decline button pressed');
               _isDialogShowing = false;
               Navigator.of(dialogContext).pop();
               
-              // Perform cleanup in background
-              MqttService().cancelCallNotification(roomId: roomId);
-              GameService.declineCall(
+              // Send decline signal FIRST before cleanup
+              await GameService.declineCall(
                 callerUsername: caller,
                 roomId: roomId,
               );
+              
+              // Then cleanup locally
+              MqttService().cancelCallNotification(roomId: roomId);
             },
             child: const Text('Decline', style: TextStyle(color: Colors.red)),
           ),
