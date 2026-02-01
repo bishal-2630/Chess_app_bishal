@@ -14,19 +14,31 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 void notificationTapBackground(NotificationResponse response) async {
   print('🔔 Notification Action: ${response.actionId}');
     try {
-      final rawData = response.payload != null ? json.decode(response.payload!) : null;
+      final rawPayload = response.payload;
+      final rawData = rawPayload != null ? json.decode(rawPayload) : null;
       final type = rawData != null ? rawData['type'] : null;
       final payload = rawData != null ? rawData['payload'] : null;
-      final roomId = payload != null ? payload['room_id'] : null;
+      final roomId = payload != null ? (payload['room_id']?.toString()) : null;
       
       print('🔔 Background Task: Signaling stop_audio (Action: ${response.actionId}, Room: $roomId)');
       
       // 1. STOP AUDIO IMMEDIATELY (Isolate-Local)
-      await MqttService().stopAudio(broadcast: false, roomId: roomId);
+      final mqtt = MqttService();
+      await mqtt.stopAudio(broadcast: false, roomId: roomId);
       
-      // 2. BROADCAST TO OTHER ISOLATES
-      FlutterBackgroundService().invoke('stopAudio', {'roomId': roomId});
-      FlutterBackgroundService().invoke('dismissCall');
+      // 2. BROADCAST TO OTHER ISOLATES (Robust)
+      try {
+        FlutterBackgroundService().invoke('stopAudio', {'roomId': roomId});
+        FlutterBackgroundService().invoke('dismissCall');
+      } catch (e) {
+        print('⚠️ Background Task: Service invoke failed: $e');
+      }
+
+      // 3. BROADCAST VIA PORTS (Fallback)
+      for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
+        final sendPort = IsolateNameServer.lookupPortByName(portName);
+        sendPort?.send({'action': 'stop_audio', 'roomId': roomId});
+      }
 
       if (response.actionId == 'decline') {
         if (type == 'call_invitation' && payload != null) {
@@ -139,25 +151,21 @@ class MqttService {
             
     // Set Audio Context for better control on physical devices
     try {
-      final AudioContext audioContext = AudioContext(
+      // Simplified context for maximum compatibility
+      const audioContext = AudioContext(
         iOS: AudioContextIOS(
           category: AVAudioSessionCategory.playback,
-          options: [
-            AVAudioSessionOptions.mixWithOthers,
-            AVAudioSessionOptions.duckOthers,
-          ],
         ),
         android: AudioContextAndroid(
-          stayAwake: true,
           usageType: AndroidUsageType.notificationRingtone,
           contentType: AndroidContentType.music,
           audioFocus: AndroidAudioFocus.gainTransientMayDuck,
         ),
       );
-      AudioLogger.logLevel = AudioLogLevel.none; // Quieten logs
-      await AudioPlayer.global.setAudioContext(audioContext);
+      AudioLogger.logLevel = AudioLogLevel.none;
+      await AudioPlayer.global.setAudioContext(audioContext).catchError((_) {});
     } catch (e) {
-      print('⚠️ MQTT: Failed to set global audio context: $e');
+      print('⚠️ MQTT: Global audio context error: $e');
     }
 
     await androidPlugin?.createNotificationChannel(challengeChannel);
@@ -574,32 +582,41 @@ class MqttService {
   Future<void> playSound(String fileName, {String? roomId}) async {
     final isolateName = Isolate.current.debugName ?? 'unknown';
     
-    // Safety check: is this room already blacklisted?
+    // Safety check 1: already declined?
     if (roomId != null && _declinedRoomIds.contains(roomId)) {
-      print('MQTT [$isolateName]: Blocking playSound - room already declined: $roomId');
+      print('MQTT [$isolateName]: Blocking playSound - room $roomId already declined');
+      return;
+    }
+
+    // Safety check 2: already in call?
+    if (_isInCall) {
+      print('MQTT [$isolateName]: Blocking playSound - user is in active call');
       return;
     }
 
     // Ensure any previous audio is completely stopped
     await stopAudio();
     
-    // Check again after stopAudio (which is async)
+    // Safety check 3: did a decline arrive during stopAudio?
     if (roomId != null && _declinedRoomIds.contains(roomId)) return;
 
     try {
       _isPlaying = true;
       _isAudioLoading = true;
-      print('MQTT [$isolateName]: Loading/Playing sound $fileName');
+      print('MQTT [$isolateName]: Starting playback sequence for $fileName');
       
-      // Reset player mode just in case
+      // Reset player mode
       await _audioPlayer.setReleaseMode(ReleaseMode.loop).catchError((_) {});
       
+      // Safety check 4: aborted?
       if (!_isPlaying) {
         print('MQTT [$isolateName]: Aborting playSound (stop received during setup)');
         return;
       }
 
-      // The path should be relative to the assets folder, e.g., 'sounds/ringtone.mp3'
+      await _audioPlayer.setVolume(1.0).catchError((_) {});
+
+      // Play the asset
       await _audioPlayer.play(AssetSource(fileName)).catchError((e) {
         print('MQTT [$isolateName]: Play error: $e');
         _isPlaying = false;
@@ -607,17 +624,15 @@ class MqttService {
       
       _isAudioLoading = false;
 
-      // CRITICAL CHECK: Did stopAudio run while we were starting play?
+      // CRITICAL Safety check 5: Did a stop/decline happen DURING play() loading?
       if (!_isPlaying) {
-        print('MQTT [$isolateName]: NUCLEAR OVERRIDE - Stopping sound that started during stop sequence');
+        print('MQTT [$isolateName]: KILL SWITCH - Sound started but was immediately marked for stopping');
         await _audioPlayer.stop().catchError((_) {});
         await _audioPlayer.setVolume(0).catchError((_) {});
         return;
       }
 
-      // Ensure volume is up
-      await _audioPlayer.setVolume(1.0).catchError((_) {});
-      print('MQTT [$isolateName]: Sound playing at 1.0 volume');
+      print('MQTT [$isolateName]: Playback confirmed active.');
     } catch (e) {
       print('MQTT [$isolateName]: Error in playSound loop: $e');
       _isPlaying = false;
