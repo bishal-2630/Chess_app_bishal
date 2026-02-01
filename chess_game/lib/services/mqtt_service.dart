@@ -13,7 +13,14 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse response) async {
   print('🔔 Notification Action: ${response.actionId}');
-    try {
+  
+  // Initialize local plugin for this temporary isolate
+  final fln = FlutterLocalNotificationsPlugin();
+  await fln.initialize(const InitializationSettings(
+    android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+  ));
+
+  try {
       final rawPayload = response.payload;
       final rawData = rawPayload != null ? json.decode(rawPayload) : null;
       final type = rawData != null ? rawData['type'] : null;
@@ -102,6 +109,7 @@ class MqttService {
   static final AudioPlayer _audioPlayer = AudioPlayer();
   static bool _isAudioLoading = false;
   static bool _isPlaying = false;
+  static bool _isMutedWindow = false; // Prevents re-ring within a short window
   bool _isInCall = false; 
   static String? _currentCallRoomId;
   static final Set<String> _declinedRoomIds = {};
@@ -135,7 +143,7 @@ class MqttService {
     );
 
     const AndroidNotificationChannel callChannel = AndroidNotificationChannel(
-      'chess_incoming_calls_v5', // Updated to v5 for hard refresh
+      'chess_incoming_calls_v6', // Fresh v6
       'Incoming Calls',
       description: 'Notifications for incoming calls',
       importance: Importance.max,
@@ -375,8 +383,8 @@ class MqttService {
       final roomId = payload['room_id'];
       
       // Check if we already suspended/declined this call
-      if (_declinedRoomIds.contains(roomId)) {
-        print('🚫 MQTT: Ignoring call invitation for declined room: $roomId');
+      if (_declinedRoomIds.contains(roomId) || _isMutedWindow) {
+        print('🚫 MQTT: Ignoring call invitation (declined or in mute window)');
         return;
       }
       
@@ -472,7 +480,7 @@ class MqttService {
     
     // Create notification with action buttons
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'chess_incoming_calls_v5', // Match v5
+      'chess_incoming_calls_v6', // v6
       'Incoming Calls',
       channelDescription: 'Notifications for incoming calls',
       importance: Importance.max,
@@ -583,6 +591,12 @@ class MqttService {
   Future<void> playSound(String fileName, {String? roomId}) async {
     final isolateName = Isolate.current.debugName ?? 'unknown';
     
+    // Safety check 0: Mute window active?
+    if (_isMutedWindow) {
+      print('MQTT [$isolateName]: Aborting playSound - Muted window');
+      return;
+    }
+
     // Safety check 1: already declined?
     if (roomId != null && _declinedRoomIds.contains(roomId)) {
       print('MQTT [$isolateName]: Blocking playSound - room $roomId already declined');
@@ -633,6 +647,7 @@ class MqttService {
     print('MQTT [$isolateName]: Stopping audio (room: $roomId)');
     
     _isPlaying = false; 
+    _isMutedWindow = true; // Start mute window
 
     if (roomId != null) {
       _declinedRoomIds.add(roomId);
@@ -640,12 +655,18 @@ class MqttService {
     _currentCallRoomId = null; 
 
     try {
+      await _audioPlayer.pause().catchError((_) {});
       await _audioPlayer.stop().catchError((_) {});
       await _audioPlayer.setVolume(0).catchError((_) {});
       await _audioPlayer.release().catchError((_) {});
     } catch (e) {
       print('MQTT [$isolateName]: Stop error: $e');
     }
+    
+    // Clear mute window after 3 seconds to allow next call but block race conditions
+    Future.delayed(const Duration(seconds: 3), () {
+      _isMutedWindow = false;
+    });
 
     if (broadcast) {
       print('MQTT [$isolateName]: Broadcasting stop_audio signal globally');
