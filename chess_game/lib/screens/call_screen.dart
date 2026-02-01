@@ -7,6 +7,7 @@ import '../services/game_service.dart';
 import '../services/mqtt_service.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:async'; // Add this import for Timer
 
 class CallScreen extends StatefulWidget {
   final String roomId;
@@ -32,7 +33,9 @@ class _CallScreenState extends State<CallScreen> {
   bool _inCall = false;
   String _status = "Connecting...";
   bool _isMuted = false;
+  bool _isMuted = false;
   bool _isExiting = false;
+  Timer? _callTimeoutTimer; // Add timer variable
 
   @override
   void initState() {
@@ -50,6 +53,38 @@ class _CallScreenState extends State<CallScreen> {
     _initRenderers();
     _connect();
     _listenForDecline();
+
+    // Start 30s timeout if I am the caller
+    if (widget.isCaller) {
+      _startCallTimeout();
+    }
+  }
+
+  void _startCallTimeout() {
+    print("⏰ Starting 30s call timeout timer...");
+    _callTimeoutTimer = Timer(const Duration(seconds: 30), () {
+      if (!mounted || _inCall || _isExiting) return;
+      
+      print("⏰ Call timed out (no answer). Cancelling...");
+      _isExiting = true; // Prevent multiple exists
+
+      // Cancel call via backend
+      GameService.cancelCall(
+        receiverUsername: widget.otherUserName,
+        roomId: widget.roomId,
+      );
+
+      // Stop audio
+      MqttService().stopAudio();
+      _signalingService.hangUp();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${widget.otherUserName} did not answer')),
+        );
+        context.go('/users');
+      }
+    });
   }
 
   void _listenForDecline() {
@@ -85,6 +120,8 @@ class _CallScreenState extends State<CallScreen> {
 
     _signalingService.onPlayerJoined = () async {
       print("👋 Peer joined the room");
+      _callTimeoutTimer?.cancel(); // Cancel timeout when answered
+      
       // Stop ringback tone as soon as someone joins
       await MqttService().stopAudio();
       
@@ -189,6 +226,8 @@ class _CallScreenState extends State<CallScreen> {
 
   @override
   void dispose() {
+    print("📞 CallScreen: dispose called");
+    _callTimeoutTimer?.cancel();
     MqttService().setInCall(false);
     _localRenderer.dispose();
     _remoteRenderer.dispose();

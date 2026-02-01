@@ -420,13 +420,12 @@ class MqttService {
         json.encode(data),
       );
       print('✅ MQTT: Call notification sent to system');
-    } else if (type == 'call_declined' || type == 'call_cancelled') {
+    } else if (type == 'call_declined') {
       final String? roomId = payload != null ? payload['room_id']?.toString() : null;
       print('🔔 MQTT: Remote termination: $type for room: $roomId');
       
       if (roomId != null) {
         ignoreRoom(roomId);
-        // FORCE stop audio for this room regardless of _currentCallRoomId
         stopAudio(broadcast: true, roomId: roomId);
         
         if (_currentCallRoomId == roomId) {
@@ -435,6 +434,21 @@ class MqttService {
       } else {
         cancelCallNotification();
       }
+    } else if (type == 'call_cancelled') {
+        final String? roomId = payload != null ? payload['room_id']?.toString() : null;
+        final String? sender = payload != null ? payload['sender'] : null; // sender is the Caller
+        print('🔔 MQTT: Call Cancelled (Missed Call) for room: $roomId');
+
+        if (roomId != null) {
+          ignoreRoom(roomId);
+          stopAudio(broadcast: true, roomId: roomId);
+          cancelCallNotification(roomId: roomId); // Stop ringing notification
+          
+          // Show Missed Call Notification
+          if (sender != null) {
+             _showMissedCallNotification(sender);
+          }
+        }
     }
     
     print('🔔 MQTT: Broadcasting event type: $type');
@@ -542,6 +556,38 @@ class MqttService {
     );
     
     print('✅ Call notification shown for $caller');
+  }
+
+  Future<void> _showMissedCallNotification(String caller) async {
+    print('📱 Creating Missed Call notification for $caller');
+    
+    // Create notification channel for missed calls if not exists
+    // (Ideally create this in initialize(), but details here work too)
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'chess_missed_calls', 
+      'Missed Calls',
+      channelDescription: 'Notifications for missed calls',
+      importance: Importance.defaultImportance,
+      priority: Priority.defaultPriority,
+      showWhen: true,
+      autoCancel: true,
+      enableVibration: true,
+      category: AndroidNotificationCategory.missedCall,
+    );
+
+    final NotificationDetails notificationDetails =
+        NotificationDetails(android: androidDetails);
+
+    // Use a unique ID (random or based on time)
+    final int notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+    await flutterLocalNotificationsPlugin.show(
+      notificationId,
+      'Missed Call',
+      'You missed a call from $caller',
+      notificationDetails,
+      payload: 'missed_call',
+    );
   }
 
   void ignoreRoom(String? roomId) {
