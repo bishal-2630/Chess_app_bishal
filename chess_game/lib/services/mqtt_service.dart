@@ -13,72 +13,50 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse response) async {
   print('🔔 Notification Action: ${response.actionId}');
-  
-  try {
-    // 1. STOP AUDIO IMMEDIATELY (Prioritize UX)
-    final data = response.payload != null ? json.decode(response.payload!) : null;
-    final roomId = data != null && data['payload'] != null ? data['payload']['room_id'] : null;
-    
-    print('🔔 Background Task: Signaling stop_audio for room: $roomId');
-    
-    // Stop locally first
-    await MqttService().stopAudio(broadcast: false, roomId: roomId);
-    
-    // Then signal others
-    FlutterBackgroundService().invoke('stopAudio', {'roomId': roomId});
-    FlutterBackgroundService().invoke('dismissCall');
-    
-    // Legacy support for ports if needed
-    for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
-      final SendPort? sendPort = IsolateNameServer.lookupPortByName(portName);
-      if (sendPort != null) {
-        sendPort.send({'action': 'stop_audio', 'roomId': roomId});
-      } else {
-        print('⚠️ Background Task: Could not find port $portName');
-      }
-    }
-
-    // 2. Initialize services
-    await DjangoAuthService().initialize(autoConnectMqtt: false);
-    
-    if (response.payload != null) {
-      final data = json.decode(response.payload!);
-      final type = data['type'];
-
-      if (response.actionId == 'accept') {
-        print('🔔 Background: Accept tapped');
-        return;
-      }
+    try {
+      final rawData = response.payload != null ? json.decode(response.payload!) : null;
+      final type = rawData != null ? rawData['type'] : null;
+      final payload = rawData != null ? rawData['payload'] : null;
+      final roomId = payload != null ? payload['room_id'] : null;
+      
+      print('🔔 Background Task: Signaling stop_audio (Action: ${response.actionId}, Room: $roomId)');
+      
+      // 1. STOP AUDIO IMMEDIATELY (Isolate-Local)
+      await MqttService().stopAudio(broadcast: false, roomId: roomId);
+      
+      // 2. BROADCAST TO OTHER ISOLATES
+      FlutterBackgroundService().invoke('stopAudio', {'roomId': roomId});
+      FlutterBackgroundService().invoke('dismissCall');
 
       if (response.actionId == 'decline') {
-        if (type == 'call_invitation') {
-          final payload = data['payload'];
+        if (type == 'call_invitation' && payload != null) {
           final caller = payload['caller'];
-          final roomId = payload['room_id'];
           if (caller != null && roomId != null) {
-            print('❌ Background: Declining call from $caller');
+            print('❌ Background Action: Declining call from $caller');
             await GameService.declineCall(callerUsername: caller, roomId: roomId);
           }
-        } else if (type == 'game_invitation') {
-          final payload = data['payload'];
+        } else if (type == 'game_invitation' && payload != null) {
           final invitationId = payload['id'];
           if (invitationId != null) {
-            print('❌ Background: Declining game invite $invitationId');
+            print('❌ Background Action: Declining game invite $invitationId');
             await GameService.respondToInvitation(invitationId: invitationId, action: 'decline');
           }
         }
+      } else if (response.actionId == 'accept') {
+        // For calls, we just stop audio and let the main app handle navigation.
+        // For game invites, we also stop audio and let the main app handle navigation.
+        print('🔔 Background Action: Accept tapped. Audio stopped, app will handle navigation.');
       }
-    }
-    
-    // 3. Manual cancel since we removed cancelNotification: true
-    if (response.id != null) {
-      final fln = FlutterLocalNotificationsPlugin();
-      await fln.cancel(response.id!);
-    }
 
-  } catch (e) {
-    print('❌ Background Action Error: $e');
-  }
+      // 3. Manual cancel since we removed cancelNotification: true
+      if (response.id != null) {
+        final fln = FlutterLocalNotificationsPlugin();
+        await fln.cancel(response.id!);
+      }
+
+    } catch (e) {
+      print('❌ Background Action Error: $e');
+    }
 }
 
 class MqttService {
@@ -136,21 +114,21 @@ class MqttService {
 
     // Create High Priority Channels
     const AndroidNotificationChannel challengeChannel = AndroidNotificationChannel(
-      'chess_challenges',
+      'chess_challenges_v2', // Updated ID
       'Chess Challenges',
       description: 'Notifications for chess game invitations',
       importance: Importance.max,
-      playSound: true,
+      playSound: false,
       enableVibration: true,
       showBadge: true,
     );
 
     const AndroidNotificationChannel callChannel = AndroidNotificationChannel(
-      'chess_incoming_calls_v2',
+      'chess_incoming_calls_v3', // Updated to v3 to force reset
       'Incoming Calls',
       description: 'Notifications for incoming calls',
       importance: Importance.max,
-      playSound: false, // We use playSound() manually
+      playSound: false,
       enableVibration: true,
       showBadge: true,
     );
@@ -159,6 +137,29 @@ class MqttService {
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
             
+    // Set Audio Context for better control on physical devices
+    try {
+      final AudioContext audioContext = AudioContext(
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.playback,
+          options: [
+            AVAudioSessionOptions.mixWithOthers,
+            AVAudioSessionOptions.duckOthers,
+          ],
+        ),
+        android: AudioContextAndroid(
+          isContentMusic: false,
+          usageType: AndroidUsageType.notificationRingtone,
+          contentType: AndroidContentType.music,
+          audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+        ),
+      );
+      AudioLogger.logLevel = AudioLogLevel.none; // Quieten logs
+      await AudioPlayer.global.setAudioContext(audioContext);
+    } catch (e) {
+      print('⚠️ MQTT: Failed to set global audio context: $e');
+    }
+
     await androidPlugin?.createNotificationChannel(challengeChannel);
     await androidPlugin?.createNotificationChannel(callChannel);
   }
@@ -462,11 +463,11 @@ class MqttService {
     
     // Create notification with action buttons
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'chess_incoming_calls_v2',
+      'chess_incoming_calls_v3', // Updated to v3
       'Incoming Calls',
       channelDescription: 'Notifications for incoming calls',
       importance: Importance.max,
-      priority: Priority.max, // Increased to max
+      priority: Priority.max,
       showWhen: true,
       fullScreenIntent: true,
       category: AndroidNotificationCategory.call,
@@ -648,6 +649,16 @@ class MqttService {
       await _audioPlayer.release().catchError((_) {});
       
       print('MQTT [$isolateName]: NUCLEAR STOP completed.');
+
+      // REDUNDANT STOP: Some devices ignore the first stop if it happens during asset loading
+      Future.delayed(const Duration(milliseconds: 500), () async {
+        if (!_isPlaying) {
+          await _audioPlayer.setVolume(0).catchError((_) {});
+          await _audioPlayer.stop().catchError((_) {});
+          await _audioPlayer.release().catchError((_) {});
+          print('MQTT [$isolateName]: REDUNDANT STOP executed.');
+        }
+      });
     } catch (e) {
       print('MQTT [$isolateName]: Error during nuclear stop: $e');
     }
