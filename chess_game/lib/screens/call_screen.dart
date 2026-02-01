@@ -256,12 +256,16 @@ class _CallScreenState extends State<CallScreen> {
                   FloatingActionButton(
                     backgroundColor: Colors.red,
                     onPressed: () {
+                      if (widget.isCaller && !_inCall) {
+                        print("📞 Caller hanging up early. Signaling cancellation...");
+                        GameService.cancelCall(
+                          receiverUsername: widget.otherUserName,
+                          roomId: widget.roomId,
+                        );
+                      }
+                      
                       _signalingService.sendEndCall();
                       _signalingService.hangUp();
-                      
-                      // If we are the caller and the call hasn't started yet, 
-                      // signalingService.sendEndCall() should be enough for the backend 
-                      // to broadcast call_declined via MQTT.
                       
                       // Use context.go to return to users list
                       context.go('/users');

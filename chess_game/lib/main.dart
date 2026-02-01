@@ -241,13 +241,16 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
     print('🔔 Processing $type (action: $action)');
 
     if (type == 'call_ended' || type == 'call_declined' || type == 'call_cancelled') {
-      print('📞 Call dismissing event received: $type. isDialogShowing: $_isDialogShowing');
+      print('📞 Call term event: $type for room: ${payload['room_id']}. isDialogShowing: $_isDialogShowing');
+      
+      // Stop audio immediately as this is a termination event
+      final roomId = payload['room_id'];
+      MqttService().stopAudio(broadcast: true, roomId: roomId);
+      
       if (_isDialogShowing) {
-        print('📞 Popping dialog...');
-        Navigator.of(context).pop();
+        print('📞 Popping dialog because call was $type');
+        Navigator.of(context, rootNavigator: true).pop();
         _isDialogShowing = false;
-      } else {
-        print('📞 Dialog suppression: No dialog was active to pop.');
       }
     } else if (type == 'call_invitation') {
       if (action == 'accept') {
