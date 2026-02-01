@@ -103,7 +103,8 @@ class MqttService {
   static final AudioPlayer _audioPlayer = AudioPlayer();
   static bool _isAudioLoading = false;
   static bool _isPlaying = false;
-  bool _isInCall = false; // Prevents ringing if we are already in a call
+  static bool _isForceSilenced = false; // Prevents any audio if true
+  bool _isInCall = false; 
   static String? _currentCallRoomId;
   static final Set<String> _declinedRoomIds = {};
 
@@ -581,6 +582,12 @@ class MqttService {
   Future<void> playSound(String fileName, {String? roomId}) async {
     final isolateName = Isolate.current.debugName ?? 'unknown';
     
+    // Safety check 0: Globally silenced?
+    if (_isForceSilenced) {
+      print('MQTT [$isolateName]: Aborting playSound - globally silenced');
+      return;
+    }
+
     // Safety check 1: already declined?
     if (roomId != null && _declinedRoomIds.contains(roomId)) {
       print('MQTT [$isolateName]: Blocking playSound - room $roomId already declined');
@@ -593,36 +600,19 @@ class MqttService {
       return;
     }
 
-    // Ensure any previous audio is completely stopped
-    await stopAudio();
-    
-    // Safety check 3: did a decline arrive during stopAudio?
-    if (roomId != null && _declinedRoomIds.contains(roomId)) {
-      print('MQTT [$isolateName]: Aborting playSound - room $roomId declined during stop sequence');
-      return;
-    }
-
-    // Safety check 4: Is there already a play request for this room?
-    if (_isPlaying && _currentCallRoomId == roomId) {
-      print('MQTT [$isolateName]: Aborting playSound - already playing for $roomId');
-      return;
-    }
+    // Ensure state is clean
+    _isPlaying = true;
+    _isAudioLoading = true;
+    _isForceSilenced = false;
 
     try {
-      _isPlaying = true;
-      _isAudioLoading = true;
       print('MQTT [$isolateName]: Starting playback sequence for $fileName');
       
       // Reset player mode
       await _audioPlayer.setReleaseMode(ReleaseMode.loop).catchError((_) {});
-      
-      // Safety check 4: aborted?
-      if (!_isPlaying) {
-        print('MQTT [$isolateName]: Aborting playSound (stop received during setup)');
-        return;
-      }
-
       await _audioPlayer.setVolume(1.0).catchError((_) {});
+
+      if (!_isPlaying || _isForceSilenced) return;
 
       // Play the asset
       await _audioPlayer.play(AssetSource(fileName)).catchError((e) {
@@ -632,15 +622,12 @@ class MqttService {
       
       _isAudioLoading = false;
 
-      // CRITICAL Safety check 5: Did a stop/decline happen DURING play() loading?
-      if (!_isPlaying) {
-        print('MQTT [$isolateName]: KILL SWITCH - Sound started but was immediately marked for stopping');
+      // Final Check
+      if (!_isPlaying || _isForceSilenced) {
+        print('MQTT [$isolateName]: KILL SWITCH triggered post-play');
         await _audioPlayer.stop().catchError((_) {});
         await _audioPlayer.setVolume(0).catchError((_) {});
-        return;
       }
-
-      print('MQTT [$isolateName]: Playback confirmed active.');
     } catch (e) {
       print('MQTT [$isolateName]: Error in playSound loop: $e');
       _isPlaying = false;
@@ -650,7 +637,8 @@ class MqttService {
 
   Future<void> stopAudio({bool broadcast = false, String? roomId}) async {
     final isolateName = Isolate.current.debugName ?? 'unknown';
-    _isPlaying = false; // Mark as not playing immediately to ignore async callbacks
+    _isPlaying = false; 
+    _isForceSilenced = true; // Block any further play() attempts in this sequence
 
     if (roomId != null) {
       _declinedRoomIds.add(roomId);
@@ -658,50 +646,30 @@ class MqttService {
     _currentCallRoomId = null; 
 
     try {
-      print('MQTT [$isolateName]: NUCLEAR STOP starting (room: $roomId)');
+      print('MQTT [$isolateName]: HYPER STOP executed for room: $roomId');
       
-      // 1. Silence
-      await _audioPlayer.setVolume(0).catchError((_) {});
-      
-      // 2. Pause & Reset (Best way to stop persistent loops on some ROMs)
-      await _audioPlayer.pause().catchError((_) {});
-      await _audioPlayer.seek(Duration.zero).catchError((_) {});
-      
-      // 3. Stop & Release
-      await _audioPlayer.stop().catchError((_) {});
-      await _audioPlayer.release().catchError((_) {});
-      
-      print('MQTT [$isolateName]: NUCLEAR STOP completed.');
-
-      // TRIPLE-HIT STOP: Some devices ignore stop if the player is "preparing"
-      // We hit it 3 times over 1.5 seconds to ensure any late-loading assets are killed.
-      for (int i = 1; i <= 3; i++) {
+      // Hit the stop command 4 times across 2 seconds to catch late-initializing hardware
+      for (int i = 0; i < 4; i++) {
         Future.delayed(Duration(milliseconds: 500 * i), () async {
-          if (!_isPlaying) {
-            await _audioPlayer.setVolume(0).catchError((_) {});
-            await _audioPlayer.stop().catchError((_) {});
-            await _audioPlayer.release().catchError((_) {});
-            print('MQTT [$isolateName]: REDUNDANT STOP #$i executed.');
-          }
+          await _audioPlayer.setVolume(0).catchError((_) {});
+          await _audioPlayer.stop().catchError((_) {});
+          await _audioPlayer.release().catchError((_) {});
+          if (i == 3) _isForceSilenced = false; // Allow future calls after sequence
         });
       }
     } catch (e) {
-      print('MQTT [$isolateName]: Error during nuclear stop: $e');
+      print('MQTT [$isolateName]: Stop utility error: $e');
     }
 
     if (broadcast) {
-      print('MQTT [$isolateName]: Broadcasting stop_audio signal...');
+      print('MQTT [$isolateName]: Broadcasting stop_audio signal globally');
       
-      final Map<String, dynamic> data = {};
-      if (roomId != null) data['roomId'] = roomId;
-
-      // NEW: Robust service-based signaling
-      FlutterBackgroundService().invoke('stopAudio', data);
-      FlutterBackgroundService().invoke('dismissCall'); // Tell other isolates to close dialogs
-
-      // LEGACY: IsolateNameServer-based signaling
+      // 1. Signal Background Service Isolate
+      FlutterBackgroundService().invoke('stopAudio', {'roomId': roomId});
+      
+      // 2. Signal all Isolates via Port Registry
       for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
-        final SendPort? sendPort = IsolateNameServer.lookupPortByName(portName);
+        final sendPort = IsolateNameServer.lookupPortByName(portName);
         if (sendPort != null) {
           sendPort.send({'action': 'stop_audio', 'roomId': roomId});
         }
