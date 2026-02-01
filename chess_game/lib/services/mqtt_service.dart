@@ -102,7 +102,6 @@ class MqttService {
   static final AudioPlayer _audioPlayer = AudioPlayer();
   static bool _isAudioLoading = false;
   static bool _isPlaying = false;
-  static bool _isBackgroundIsolate = false; // AUTHORITY FLAG
   bool _isInCall = false; 
   static String? _currentCallRoomId;
   static final Set<String> _declinedRoomIds = {};
@@ -136,7 +135,7 @@ class MqttService {
     );
 
     const AndroidNotificationChannel callChannel = AndroidNotificationChannel(
-      'chess_incoming_calls_v4', // Updated to v4 to force hard reset
+      'chess_incoming_calls_v5', // Updated to v5 for hard refresh
       'Incoming Calls',
       description: 'Notifications for incoming calls',
       importance: Importance.max,
@@ -396,13 +395,8 @@ class MqttService {
       print('🔔 MQTT: Showing call invitation notification');
       _currentCallRoomId = roomId;
       
-      // AUTHORITY: Only the background isolate handles the Ringer
-      if (_isBackgroundIsolate) {
-        print('🔊 MQTT AUTHORITY: Background isolate playing ringtone');
-        playSound('sounds/ringtone.mp3', roomId: roomId);
-      } else {
-        print('🔇 MQTT: Main isolate skipping ringtone (Authority in Background)');
-      }
+      // RESTORED: Play sound immediately
+      playSound('sounds/ringtone.mp3', roomId: roomId);
 
       _showCallNotification(
         '${payload['caller']}',
@@ -478,7 +472,7 @@ class MqttService {
     
     // Create notification with action buttons
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'chess_incoming_calls_v4', // Match v4
+      'chess_incoming_calls_v5', // Match v5
       'Incoming Calls',
       channelDescription: 'Notifications for incoming calls',
       importance: Importance.max,
@@ -584,11 +578,6 @@ class MqttService {
   void onSubscribed(String topic) {
     print('✅ MQTT: Successfully subscribed to topic: $topic');
     print('✅ MQTT: Now listening for messages on: $topic');
-  }
-
-  static void setAsRingingAuthority() {
-    print('🔊 MQTT: This isolate is now the Authoritative Ringer');
-    _isBackgroundIsolate = true;
   }
 
   Future<void> playSound(String fileName, {String? roomId}) async {

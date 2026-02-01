@@ -59,9 +59,6 @@ class BackgroundServiceInstance {
     final authService = DjangoAuthService();
     await authService.initialize(); // Load from prefs
 
-    // AUTHORITY: Tag this as the ringing isolate
-    MqttService.setAsRingingAuthority();
-
     // Always register port immediately on start so it can receive stop signals
     final mqttService = MqttService();
     mqttService.initializeIsolateListener(isBackground: true);
