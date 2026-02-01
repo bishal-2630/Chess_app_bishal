@@ -33,7 +33,6 @@ class _CallScreenState extends State<CallScreen> {
   bool _inCall = false;
   String _status = "Connecting...";
   bool _isMuted = false;
-  bool _isMuted = false;
   bool _isExiting = false;
   Timer? _callTimeoutTimer; // Add timer variable
 
