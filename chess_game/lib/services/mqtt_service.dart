@@ -177,6 +177,14 @@ class MqttService {
 
     await androidPlugin?.createNotificationChannel(challengeChannel);
     await androidPlugin?.createNotificationChannel(callChannel);
+
+    // Request notification permissions for Android 13+ (API 33+)
+    final bool? permissionGranted = await androidPlugin?.requestNotificationsPermission();
+    if (permissionGranted == true) {
+      print('✅ MQTT: Notification permission granted');
+    } else {
+      print('⚠️ MQTT: Notification permission denied or not requested');
+    }
   }
   
   void initializeIsolateListener({bool isBackground = false}) {
