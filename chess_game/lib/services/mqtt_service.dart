@@ -515,7 +515,7 @@ class MqttService {
       _currentCallRoomId = null;
     }
     
-    stopAudio(broadcast: true, roomId: currentRoomId);
+    stopAudio(broadcast: true, roomId: _currentCallRoomId);
   }
   
   void setInCall(bool inCall) {
