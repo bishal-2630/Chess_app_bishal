@@ -165,7 +165,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
       if (roomId != null) {
         MqttService().ignoreRoom(roomId);
       }
-      MqttService().stopAudio(broadcast: false);
+      MqttService().stopAudio(broadcast: false, roomId: roomId);
     });
     
     // Listen for dismissCall from other isolates
@@ -379,7 +379,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
               Navigator.of(dialogContext).pop();
               
               // Perform cleanup in background
-              MqttService().cancelCallNotification();
+              MqttService().cancelCallNotification(roomId: roomId);
               GameService.declineCall(
                 callerUsername: caller,
                 roomId: roomId,
@@ -397,7 +397,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
               context.go('/call?roomId=$roomId&otherUserName=$caller&isCaller=false');
 
               // Cleanup in background
-              MqttService().cancelCallNotification();
+              MqttService().cancelCallNotification(roomId: roomId);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             child: const Text('Accept'),

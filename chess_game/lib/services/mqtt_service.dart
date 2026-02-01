@@ -111,10 +111,11 @@ class MqttService {
   }
 
   static final AudioPlayer _audioPlayer = AudioPlayer();
-  bool _isPlaying = false;
+  static bool _isAudioLoading = false;
+  static bool _isPlaying = false;
   bool _isInCall = false; // Prevents ringing if we are already in a call
-  String? _currentCallRoomId;
-  final Set<String> _declinedRoomIds = {};
+  static String? _currentCallRoomId;
+  static final Set<String> _declinedRoomIds = {};
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -400,7 +401,7 @@ class MqttService {
         ignoreRoom(roomId);
         // If it's the current call, cancel notification and stop audio
         if (_currentCallRoomId == roomId) {
-          cancelCallNotification();
+          cancelCallNotification(roomId: roomId);
         } else {
           // Just broadcast stop audio for this room anyway to be safe
           stopAudio(broadcast: true, roomId: roomId);
@@ -518,24 +519,28 @@ class MqttService {
     }
   }
 
-  Future<void> cancelCallNotification() async {
+  Future<void> cancelCallNotification({String? roomId}) async {
     const int callNotificationId = 999;
     await flutterLocalNotificationsPlugin.cancel(callNotificationId);
     
-    final String? roomIdToStop = _currentCallRoomId;
+    // Prioritize the passed roomId, then the current one
+    final String? roomIdToStop = roomId ?? _currentCallRoomId;
     
-    // Add current room to declined set so we don't ring again for it
-    if (_currentCallRoomId != null) {
-      final roomId = _currentCallRoomId!;
-      _declinedRoomIds.add(roomId);
-      print('🚫 MQTT: Added $roomId to declined list');
+    // Add room to declined set so we don't ring again for it
+    if (roomIdToStop != null) {
+      _declinedRoomIds.add(roomIdToStop);
+      print('🚫 MQTT: Added $roomIdToStop to declined list');
       
-      // Auto-clear after 1 minute to keep set size small
-      // We use the captured 'roomId' variable, not the field which becomes null
+      // Auto-clear after 1 minute
       Future.delayed(const Duration(minutes: 1), () {
-        _declinedRoomIds.remove(roomId);
-        print('🚫 MQTT: Removed $roomId from declined list (expired)');
+        _declinedRoomIds.remove(roomIdToStop);
+        print('🚫 MQTT: Removed $roomIdToStop from declined list (expired)');
       });
+
+      if (_currentCallRoomId == roomIdToStop) {
+        _currentCallRoomId = null;
+      }
+    } else {
       _currentCallRoomId = null;
     }
     
@@ -570,28 +575,52 @@ class MqttService {
     
     // Safety check: is this room already blacklisted?
     if (roomId != null && _declinedRoomIds.contains(roomId)) {
-      print('MQTT [$isolateName]: Blocking playSound for blacklisted room: $roomId');
+      print('MQTT [$isolateName]: Blocking playSound - room already declined: $roomId');
       return;
     }
 
     // Ensure any previous audio is completely stopped
     await stopAudio();
     
+    // Check again after stopAudio (which is async)
+    if (roomId != null && _declinedRoomIds.contains(roomId)) return;
+
     try {
       _isPlaying = true;
-      print('MQTT [$isolateName]: Playing sound $fileName');
+      _isAudioLoading = true;
+      print('MQTT [$isolateName]: Loading/Playing sound $fileName');
       
       // Reset player mode just in case
-      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-      // The path should be relative to the assets folder, e.g., 'sounds/ringtone.mp3'
-      await _audioPlayer.play(AssetSource(fileName));
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop).catchError((_) {});
       
-      // Ensure volume is up (it might have been set to 0 by stopAudio)
-      // Call this after play to ensure the player is in an active state
-      await _audioPlayer.setVolume(1.0);
+      if (!_isPlaying) {
+        print('MQTT [$isolateName]: Aborting playSound (stop received during setup)');
+        return;
+      }
+
+      // The path should be relative to the assets folder, e.g., 'sounds/ringtone.mp3'
+      await _audioPlayer.play(AssetSource(fileName)).catchError((e) {
+        print('MQTT [$isolateName]: Play error: $e');
+        _isPlaying = false;
+      });
+      
+      _isAudioLoading = false;
+
+      // CRITICAL CHECK: Did stopAudio run while we were starting play?
+      if (!_isPlaying) {
+        print('MQTT [$isolateName]: NUCLEAR OVERRIDE - Stopping sound that started during stop sequence');
+        await _audioPlayer.stop().catchError((_) {});
+        await _audioPlayer.setVolume(0).catchError((_) {});
+        return;
+      }
+
+      // Ensure volume is up
+      await _audioPlayer.setVolume(1.0).catchError((_) {});
+      print('MQTT [$isolateName]: Sound playing at 1.0 volume');
     } catch (e) {
-      print('MQTT [$isolateName]: Error playing sound $fileName: $e');
+      print('MQTT [$isolateName]: Error in playSound loop: $e');
       _isPlaying = false;
+      _isAudioLoading = false;
     }
   }
 
