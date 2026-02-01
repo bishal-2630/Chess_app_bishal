@@ -443,8 +443,13 @@ class MqttService {
       priority: Priority.max,
       showWhen: true,
       fullScreenIntent: true, // Show on lock screen
-      category: AndroidNotificationCategory.email, // Or message/event
+      category: AndroidNotificationCategory.message,
       visibility: NotificationVisibility.public,
+      ticker: title, // Ensures notification appears
+      styleInformation: BigTextStyleInformation(
+        body,
+        contentTitle: title,
+      ),
       actions: <AndroidNotificationAction>[
         AndroidNotificationAction(
           'decline',
@@ -493,6 +498,11 @@ class MqttService {
       autoCancel: false,
       playSound: false,
       enableVibration: true,
+      ticker: 'Incoming call from $caller', // Ensures notification appears
+      styleInformation: BigTextStyleInformation(
+        '$caller is calling you...',
+        contentTitle: 'Incoming Call',
+      ),
       actions: <AndroidNotificationAction>[
         const AndroidNotificationAction(
           'decline',
