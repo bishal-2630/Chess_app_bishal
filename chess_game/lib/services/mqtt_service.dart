@@ -563,7 +563,7 @@ class MqttService {
     
     // Create notification channel for missed calls if not exists
     // (Ideally create this in initialize(), but details here work too)
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'chess_missed_calls', 
       'Missed Calls',
       channelDescription: 'Notifications for missed calls',
