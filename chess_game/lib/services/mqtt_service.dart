@@ -434,7 +434,7 @@ class MqttService {
   }
 
   Future<void> _showGameNotification(String title, String body, String payload) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+    final AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
       'chess_challenges',
       'Chess Challenges',
@@ -451,13 +451,13 @@ class MqttService {
         contentTitle: title,
       ),
       actions: <AndroidNotificationAction>[
-        AndroidNotificationAction(
+        const AndroidNotificationAction(
           'decline',
           'Decline',
           showsUserInterface: false,
           cancelNotification: false, // Manual cancel
         ),
-        AndroidNotificationAction(
+        const AndroidNotificationAction(
           'accept',
           'Accept',
           showsUserInterface: true,
