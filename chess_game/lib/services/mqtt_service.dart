@@ -403,20 +403,19 @@ class MqttService {
       );
       print('✅ MQTT: Call notification sent to system');
     } else if (type == 'call_declined' || type == 'call_cancelled') {
-      final String? roomId = payload != null ? payload['room_id'] : null;
+      final String? roomId = payload != null ? payload['room_id']?.toString() : null;
       print('🔔 MQTT: Remote termination: $type for room: $roomId');
       
       if (roomId != null) {
         ignoreRoom(roomId);
-        // If it's the current call, cancel notification and stop audio
+        // FORCE stop audio for this room regardless of _currentCallRoomId
+        stopAudio(broadcast: true, roomId: roomId);
+        
         if (_currentCallRoomId == roomId) {
           cancelCallNotification(roomId: roomId);
-        } else {
-          // Just broadcast stop audio for this room anyway to be safe
-          stopAudio(broadcast: true, roomId: roomId);
         }
       } else {
-        cancelCallNotification(); // Fallback to current
+        cancelCallNotification();
       }
     }
     
@@ -598,7 +597,16 @@ class MqttService {
     await stopAudio();
     
     // Safety check 3: did a decline arrive during stopAudio?
-    if (roomId != null && _declinedRoomIds.contains(roomId)) return;
+    if (roomId != null && _declinedRoomIds.contains(roomId)) {
+      print('MQTT [$isolateName]: Aborting playSound - room $roomId declined during stop sequence');
+      return;
+    }
+
+    // Safety check 4: Is there already a play request for this room?
+    if (_isPlaying && _currentCallRoomId == roomId) {
+      print('MQTT [$isolateName]: Aborting playSound - already playing for $roomId');
+      return;
+    }
 
     try {
       _isPlaying = true;
@@ -665,15 +673,18 @@ class MqttService {
       
       print('MQTT [$isolateName]: NUCLEAR STOP completed.');
 
-      // REDUNDANT STOP: Some devices ignore the first stop if it happens during asset loading
-      Future.delayed(const Duration(milliseconds: 500), () async {
-        if (!_isPlaying) {
-          await _audioPlayer.setVolume(0).catchError((_) {});
-          await _audioPlayer.stop().catchError((_) {});
-          await _audioPlayer.release().catchError((_) {});
-          print('MQTT [$isolateName]: REDUNDANT STOP executed.');
-        }
-      });
+      // TRIPLE-HIT STOP: Some devices ignore stop if the player is "preparing"
+      // We hit it 3 times over 1.5 seconds to ensure any late-loading assets are killed.
+      for (int i = 1; i <= 3; i++) {
+        Future.delayed(Duration(milliseconds: 500 * i), () async {
+          if (!_isPlaying) {
+            await _audioPlayer.setVolume(0).catchError((_) {});
+            await _audioPlayer.stop().catchError((_) {});
+            await _audioPlayer.release().catchError((_) {});
+            print('MQTT [$isolateName]: REDUNDANT STOP #$i executed.');
+          }
+        });
+      }
     } catch (e) {
       print('MQTT [$isolateName]: Error during nuclear stop: $e');
     }
