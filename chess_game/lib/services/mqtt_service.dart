@@ -21,16 +21,18 @@ void notificationTapBackground(NotificationResponse response) async {
     
     print('🔔 Background Task: Signaling stop_audio for room: $roomId');
     
-    // Using robust service.invoke instead of legacy ports
+    // Stop locally first
+    await MqttService().stopAudio(broadcast: false, roomId: roomId);
+    
+    // Then signal others
     FlutterBackgroundService().invoke('stopAudio', {'roomId': roomId});
     FlutterBackgroundService().invoke('dismissCall');
     
-    // Legacy support for ports if needed, but invoke is preferred
+    // Legacy support for ports if needed
     for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
       final SendPort? sendPort = IsolateNameServer.lookupPortByName(portName);
       if (sendPort != null) {
-        print('🔔 Background Task: Signaling stop_audio to $portName');
-        sendPort.send('stop_audio');
+        sendPort.send({'action': 'stop_audio', 'roomId': roomId});
       } else {
         print('⚠️ Background Task: Could not find port $portName');
       }
@@ -108,7 +110,7 @@ class MqttService {
     _notificationController.add(data);
   }
 
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  static final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
   bool _isInCall = false; // Prevents ringing if we are already in a call
   String? _currentCallRoomId;
@@ -169,8 +171,10 @@ class MqttService {
     _listenerPort.listen((message) async {
       print("🔔 [$portName] Isolate received: $message");
       if (message == 'stop_audio') {
-        print("🔔 [$portName] EXECUTING LOCAL STOP");
-        await stopAudio(broadcast: false); // Stop local audio only
+        await stopAudio(broadcast: false);
+      } else if (message is Map && message['action'] == 'stop_audio') {
+        final roomId = message['roomId'];
+        await stopAudio(broadcast: false, roomId: roomId);
       }
     });
   }
@@ -381,7 +385,7 @@ class MqttService {
 
       print('🔔 MQTT: Showing call invitation notification');
       _currentCallRoomId = roomId;
-      playSound('sounds/ringtone.mp3');
+      playSound('sounds/ringtone.mp3', roomId: roomId);
       _showCallNotification(
         '${payload['caller']}',
         roomId,
@@ -561,8 +565,15 @@ class MqttService {
     print('✅ MQTT: Now listening for messages on: $topic');
   }
 
-  Future<void> playSound(String fileName) async {
+  Future<void> playSound(String fileName, {String? roomId}) async {
     final isolateName = Isolate.current.debugName ?? 'unknown';
+    
+    // Safety check: is this room already blacklisted?
+    if (roomId != null && _declinedRoomIds.contains(roomId)) {
+      print('MQTT [$isolateName]: Blocking playSound for blacklisted room: $roomId');
+      return;
+    }
+
     // Ensure any previous audio is completely stopped
     await stopAudio();
     
@@ -586,21 +597,30 @@ class MqttService {
 
   Future<void> stopAudio({bool broadcast = false, String? roomId}) async {
     final isolateName = Isolate.current.debugName ?? 'unknown';
+    _isPlaying = false; // Mark as not playing immediately to ignore async callbacks
+
+    if (roomId != null) {
+      _declinedRoomIds.add(roomId);
+    }
+    _currentCallRoomId = null; 
+
     try {
-      print('MQTT [$isolateName]: Stopping audio locally... (room: $roomId)');
-      await _audioPlayer.setVolume(0); // Silence first
-      await _audioPlayer.setReleaseMode(ReleaseMode.stop); // Reset to stop mode
-      await _audioPlayer.stop();
-      await _audioPlayer.release(); // Force release resources
-      _isPlaying = false;
+      print('MQTT [$isolateName]: NUCLEAR STOP starting (room: $roomId)');
       
-      if (roomId != null) {
-        _declinedRoomIds.add(roomId);
-      }
-      _currentCallRoomId = null; // Important: Clear room ID when stopping
-      print('MQTT [$isolateName]: Local audio stopped.');
+      // 1. Silence
+      await _audioPlayer.setVolume(0).catchError((_) {});
+      
+      // 2. Pause & Reset (Best way to stop persistent loops on some ROMs)
+      await _audioPlayer.pause().catchError((_) {});
+      await _audioPlayer.seek(Duration.zero).catchError((_) {});
+      
+      // 3. Stop & Release
+      await _audioPlayer.stop().catchError((_) {});
+      await _audioPlayer.release().catchError((_) {});
+      
+      print('MQTT [$isolateName]: NUCLEAR STOP completed.');
     } catch (e) {
-      print('MQTT [$isolateName]: Error stopping local audio: $e');
+      print('MQTT [$isolateName]: Error during nuclear stop: $e');
     }
 
     if (broadcast) {
@@ -617,8 +637,7 @@ class MqttService {
       for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
         final SendPort? sendPort = IsolateNameServer.lookupPortByName(portName);
         if (sendPort != null) {
-          print('MQTT [$isolateName]: Sending to $portName');
-          sendPort.send('stop_audio');
+          sendPort.send({'action': 'stop_audio', 'roomId': roomId});
         }
       }
     }

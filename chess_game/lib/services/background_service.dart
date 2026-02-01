@@ -76,11 +76,11 @@ class BackgroundServiceInstance {
     // Use service.on for robust communication from Main Isolate
     service.on('stopAudio').listen((event) {
       final roomId = event?['roomId'];
-      print('Background Isolate: Received stopAudio signal (roomId: $roomId)');
+      print('Background Isolate: NUCLEAR STOP triggered via service (roomId: $roomId)');
       if (roomId != null) {
         MqttService().ignoreRoom(roomId);
       }
-      MqttService().stopAudio(broadcast: false);
+      MqttService().stopAudio(broadcast: false, roomId: roomId);
     });
 
     service.on('stopService').listen((event) {
