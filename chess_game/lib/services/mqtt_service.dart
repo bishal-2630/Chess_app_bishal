@@ -148,7 +148,7 @@ class MqttService {
           ],
         ),
         android: AudioContextAndroid(
-          isContentMusic: false,
+          stayAwake: true,
           usageType: AndroidUsageType.notificationRingtone,
           contentType: AndroidContentType.music,
           audioFocus: AndroidAudioFocus.gainTransientMayDuck,
