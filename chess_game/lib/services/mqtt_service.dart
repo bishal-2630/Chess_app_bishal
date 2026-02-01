@@ -465,7 +465,7 @@ class MqttService {
         ),
       ],
     );
-    const NotificationDetails platformChannelSpecifics =
+    final NotificationDetails platformChannelSpecifics =
         NotificationDetails(android: androidPlatformChannelSpecifics);
     
     // Use a fixed ID for game notifications so they are manageable
