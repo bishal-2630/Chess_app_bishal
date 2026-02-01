@@ -644,28 +644,50 @@ class MqttService {
   Future<void> stopAudio({bool broadcast = false, String? roomId}) async {
     final isolateName = Isolate.current.debugName ?? 'unknown';
     
-    print('MQTT [$isolateName]: Stopping audio (room: $roomId)');
+    print('🛑 MQTT [$isolateName]: ===== STOP AUDIO CALLED =====');
+    print('🛑 MQTT [$isolateName]: Room: $roomId, Broadcast: $broadcast');
+    print('🛑 MQTT [$isolateName]: Current _isPlaying: $_isPlaying');
+    print('🛑 MQTT [$isolateName]: Current _isMutedWindow: $_isMutedWindow');
     
     _isPlaying = false; 
     _isMutedWindow = true; // Start mute window
 
     if (roomId != null) {
       _declinedRoomIds.add(roomId);
+      print('🛑 MQTT [$isolateName]: Added $roomId to declined list');
     }
     _currentCallRoomId = null; 
 
     try {
-      await _audioPlayer.pause().catchError((_) {});
-      await _audioPlayer.stop().catchError((_) {});
-      await _audioPlayer.setVolume(0).catchError((_) {});
-      await _audioPlayer.release().catchError((_) {});
+      print('🛑 MQTT [$isolateName]: Executing pause...');
+      await _audioPlayer.pause().catchError((e) {
+        print('🛑 MQTT [$isolateName]: Pause error: $e');
+      });
+      
+      print('🛑 MQTT [$isolateName]: Executing stop...');
+      await _audioPlayer.stop().catchError((e) {
+        print('🛑 MQTT [$isolateName]: Stop error: $e');
+      });
+      
+      print('🛑 MQTT [$isolateName]: Setting volume to 0...');
+      await _audioPlayer.setVolume(0).catchError((e) {
+        print('🛑 MQTT [$isolateName]: Volume error: $e');
+      });
+      
+      print('🛑 MQTT [$isolateName]: Executing release...');
+      await _audioPlayer.release().catchError((e) {
+        print('🛑 MQTT [$isolateName]: Release error: $e');
+      });
+      
+      print('🛑 MQTT [$isolateName]: Audio hardware commands completed');
     } catch (e) {
-      print('MQTT [$isolateName]: Stop error: $e');
+      print('🛑 MQTT [$isolateName]: Stop error: $e');
     }
     
     // Clear mute window after 3 seconds to allow next call but block race conditions
     Future.delayed(const Duration(seconds: 3), () {
       _isMutedWindow = false;
+      print('🛑 MQTT [$isolateName]: Mute window cleared');
     });
 
     if (broadcast) {

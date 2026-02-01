@@ -375,16 +375,20 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
           TextButton(
             onPressed: () async {
               print('📞 UI: Decline button pressed');
+              
+              // IMMEDIATE: Stop audio FIRST before anything else
+              await MqttService().stopAudio(broadcast: true, roomId: roomId);
+              
               _isDialogShowing = false;
               Navigator.of(dialogContext).pop();
               
-              // Send decline signal FIRST before cleanup
+              // Send decline signal to caller
               await GameService.declineCall(
                 callerUsername: caller,
                 roomId: roomId,
               );
               
-              // Then cleanup locally
+              // Then cleanup notification
               MqttService().cancelCallNotification(roomId: roomId);
             },
             child: const Text('Decline', style: TextStyle(color: Colors.red)),
