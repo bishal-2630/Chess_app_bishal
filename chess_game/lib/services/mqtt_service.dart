@@ -485,6 +485,17 @@ class MqttService {
     print('✅ Call notification shown for $caller');
   }
 
+  void ignoreRoom(String? roomId) {
+    if (roomId != null) {
+      _declinedRoomIds.add(roomId);
+      print('🚫 MQTT: Added $roomId to ignored list (cross-isolate)');
+      Future.delayed(const Duration(minutes: 1), () {
+        _declinedRoomIds.remove(roomId);
+        print('🚫 MQTT: Removed $roomId from ignored list (expired)');
+      });
+    }
+  }
+
   Future<void> cancelCallNotification() async {
     const int callNotificationId = 999;
     await flutterLocalNotificationsPlugin.cancel(callNotificationId);
@@ -504,7 +515,7 @@ class MqttService {
       _currentCallRoomId = null;
     }
     
-    stopAudio(broadcast: true);
+    stopAudio(broadcast: true, roomId: currentRoomId);
   }
   
   void setInCall(bool inCall) {
@@ -553,14 +564,19 @@ class MqttService {
     }
   }
 
-  Future<void> stopAudio({bool broadcast = false}) async {
+  Future<void> stopAudio({bool broadcast = false, String? roomId}) async {
     final isolateName = Isolate.current.debugName ?? 'unknown';
     try {
-      print('MQTT [$isolateName]: Stopping audio locally...');
+      print('MQTT [$isolateName]: Stopping audio locally... (room: $roomId)');
       await _audioPlayer.setVolume(0); // Silence first
+      await _audioPlayer.setReleaseMode(ReleaseMode.stop); // Reset to stop mode
       await _audioPlayer.stop();
       await _audioPlayer.release(); // Force release resources
       _isPlaying = false;
+      
+      if (roomId != null) {
+        _declinedRoomIds.add(roomId);
+      }
       _currentCallRoomId = null; // Important: Clear room ID when stopping
       print('MQTT [$isolateName]: Local audio stopped.');
     } catch (e) {
@@ -570,8 +586,11 @@ class MqttService {
     if (broadcast) {
       print('MQTT [$isolateName]: Broadcasting stop_audio signal...');
       
+      final Map<String, dynamic> data = {};
+      if (roomId != null) data['roomId'] = roomId;
+
       // NEW: Robust service-based signaling
-      FlutterBackgroundService().invoke('stopAudio');
+      FlutterBackgroundService().invoke('stopAudio', data);
       FlutterBackgroundService().invoke('dismissCall'); // Tell other isolates to close dialogs
 
       // LEGACY: IsolateNameServer-based signaling

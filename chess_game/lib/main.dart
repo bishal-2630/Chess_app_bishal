@@ -16,6 +16,7 @@ import 'services/background_service.dart';
 import 'dart:async';
 import 'dart:isolate';
 import 'dart:ui';
+import 'package:flutter_background_service/flutter_background_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -159,7 +160,11 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
     
     // Listen for stopAudio from other isolates
     service.on('stopAudio').listen((event) {
-      print('Main Isolate UI: Received stopAudio signal from service.invoke');
+      final roomId = event?['roomId'];
+      print('Main Isolate UI: Received stopAudio signal (roomId: $roomId)');
+      if (roomId != null) {
+        MqttService().ignoreRoom(roomId);
+      }
       MqttService().stopAudio(broadcast: false);
     });
     
