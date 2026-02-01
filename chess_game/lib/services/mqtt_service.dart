@@ -436,7 +436,7 @@ class MqttService {
   Future<void> _showGameNotification(String title, String body, String payload) async {
     final AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
-      'chess_challenges',
+      'chess_challenges_v2', // Match channel creation ID
       'Chess Challenges',
       channelDescription: 'Notifications for chess game invitations',
       importance: Importance.max,
