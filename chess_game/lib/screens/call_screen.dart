@@ -60,7 +60,7 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   void _startCallTimeout() {
-    _callTimeoutTimer = Timer(const Duration(seconds: 30), () {
+    _callTimeoutTimer = Timer(const Duration(seconds: 20), () {
       if (!mounted || _inCall || _isExiting) return;
       
       _isExiting = true; // Prevent multiple exists

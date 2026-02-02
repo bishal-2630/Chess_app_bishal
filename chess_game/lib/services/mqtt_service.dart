@@ -403,7 +403,7 @@ class MqttService {
       }
     } else if (type == 'call_cancelled') {
         final String? roomId = payload != null ? payload['room_id']?.toString() : null;
-        final String? sender = payload != null ? payload['sender'] : null; // sender is the Caller
+        final String? sender = payload != null ? (payload['sender'] ?? payload['caller']) : null; // sender/caller is the person who initiated the call
 
         if (roomId != null) {
           ignoreRoom(roomId);
@@ -479,8 +479,8 @@ class MqttService {
       fullScreenIntent: true,
       category: AndroidNotificationCategory.call,
       visibility: NotificationVisibility.public,
-      ongoing: true,
-      autoCancel: false,
+      ongoing: false,
+      autoCancel: true,
       playSound: false,
       enableVibration: true,
       ticker: 'Incoming call from $caller', // Ensures notification appears

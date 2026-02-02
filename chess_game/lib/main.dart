@@ -161,7 +161,6 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
     // Listen for stopAudio from other isolates
     service.on('stopAudio').listen((event) {
       final roomId = event?['roomId'];
-      print('Main Isolate UI: Received stopAudio signal (roomId: $roomId)');
       if (roomId != null) {
         MqttService().ignoreRoom(roomId);
       }
@@ -170,14 +169,12 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
     
     // Listen for dismissCall from other isolates
     service.on('dismissCall').listen((event) {
-      print('Main Isolate UI: Received dismissCall signal from service.invoke');
       _dismissCurrentDialog();
     });
   }
 
   void _dismissCurrentDialog() {
     if (_isDialogShowing && mounted) {
-      print('Main Isolate UI: Closing current call dialog');
       Navigator.of(context, rootNavigator: true).pop();
       _isDialogShowing = false;
     }
@@ -186,7 +183,6 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
   Future<void> _handleInitialNotification() async {
     final details = await MqttService().flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails();
     if (details != null && details.didNotificationLaunchApp && details.notificationResponse != null) {
-      print('🚀 App launched via notification action: ${details.notificationResponse?.actionId}');
       // Immediately pass to MqttService to buffer it
       MqttService().onNotificationTapped(details.notificationResponse!);
     }
@@ -200,25 +196,20 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
           authService.currentUser?['username'] ?? authService.guestName;
       print('🔍 Username: $username');
       if (username != null) {
-        print('🔌 Attempting to connect MQTT for user: $username');
         await MqttService().connect(username);
-        print('🔌 MQTT connect call completed');
       }
     }
   }
 
   void _listenForNotifications() {
-    print('🔔 Setting up notification listener...');
     final mqtt = MqttService();
     
     mqtt.notifications.listen((data) {
-      print('🔔 Received notification event in main isolate: $data');
       _processNotificationData(data);
     });
 
     // Check for buffered event (e.g., from cold launch)
     if (mqtt.lastNotificationEvent != null) {
-      print('🚀 Processing startup notification');
       final event = mqtt.lastNotificationEvent!;
       mqtt.clearLastNotification();
       
@@ -238,23 +229,18 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
     final action = data['action'];
     final payload = data['data'] ?? data['payload'];
 
-    print('🔔 Processing $type (action: $action)');
 
     if (type == 'call_ended' || type == 'call_declined' || type == 'call_cancelled') {
-      print('📞 Call term event: $type for room: ${payload['room_id']}. isDialogShowing: $_isDialogShowing');
-      
       // Stop audio immediately as this is a termination event
       final roomId = payload['room_id'];
       MqttService().stopAudio(broadcast: true, roomId: roomId);
       
       if (_isDialogShowing) {
-        print('📞 Popping dialog because call was $type');
         Navigator.of(context, rootNavigator: true).pop();
         _isDialogShowing = false;
       }
     } else if (type == 'call_invitation') {
       if (action == 'accept') {
-        print('📞 Auto-accepting call from notification stream');
         
         if (_isDialogShowing) {
            Navigator.of(context).pop();
@@ -270,15 +256,12 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
         try {
           context.go('/call?roomId=$roomId&otherUserName=$caller&isCaller=false');
         } catch (e) {
-          print("❌ Navigation failed: $e");
         }
       } else {
         _showIncomingCallDialog(payload);
       }
     } else if (type == 'game_invitation') {
       if (action == 'accept') {
-        print('🎮 Auto-accepting game invite from notification stream');
-        
         if (_isDialogShowing) {
           Navigator.of(context).pop();
           _isDialogShowing = false;
@@ -309,7 +292,6 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
   }
 
   void _handleInvitationResponse(Map<String, dynamic> data) {
-    print('IncomingCallWrapper: _handleInvitationResponse called with data: $data');
     final action = data['action'];
     final invitation = data['invitation'];
     final receiver = invitation['receiver']['username'];
@@ -345,7 +327,6 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
     final caller = callData['caller'];
 
     if (_isDialogShowing) {
-      print('📞 UI: Incoming call dialog already showing, skipping duplicate.');
       return;
     }
     
