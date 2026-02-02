@@ -22,11 +22,12 @@ void notificationTapBackground(NotificationResponse response) async {
   ));
 
     try {
-      print('🔔 [BG] Notification Response: id=${response.id}, actionId=${response.actionId}');
+      print('🔔 [BG] START: id=${response.id}, actionId=${response.actionId}');
       
-      // 0. INITIALIZE AUTH (Crucial for GameService calls in background isolate)
+      // 0. INITIALIZE AUTH (Don't auto-connect MQTT to avoid isolate race/delays)
       final authService = DjangoAuthService();
-      await authService.initialize();
+      await authService.initialize(autoConnectMqtt: false);
+      print('🔐 [BG] Auth Initialized. LoggedIn: ${authService.isLoggedIn}');
 
       final rawPayload = response.payload;
       final rawData = rawPayload != null ? json.decode(rawPayload) : null;
@@ -59,27 +60,29 @@ void notificationTapBackground(NotificationResponse response) async {
       }
 
       if (response.actionId == 'decline') {
-        print('❌ [BG] Executing DECLINE...');
+        print('❌ [BG] ACTION: DECLINE');
         if ((type == 'call_invitation' || type == 'incoming_call') && payload != null) {
           final caller = payload['caller'] ?? payload['sender'];
           if (caller != null && roomId != null) {
+            print('📡 [BG] Sending Decline Signal for Call to: $caller');
             await GameService.declineCall(callerUsername: caller, roomId: roomId);
-            print('✅ [BG] Decline signal SENT for call');
+            print('✅ [BG] Decline Signal SUCCESS');
           } else {
-            print('⚠️ [BG] Could not decline call: missing caller ($caller) or roomId ($roomId)');
+            print('⚠️ [BG] Decline missing data: caller=$caller, roomId=$roomId');
           }
         } else if ((type == 'game_invitation' || type == 'game_challenge') && payload != null) {
-          final invitationId = payload['id'];
+          final rawId = payload['id'];
+          final invitationId = int.tryParse(rawId.toString());
           if (invitationId != null) {
+            print('📡 [BG] Sending Decline Signal for Game ID: $invitationId');
             await GameService.respondToInvitation(invitationId: invitationId, action: 'decline');
-            print('✅ [BG] Decline signal SENT for game');
+            print('✅ [BG] Decline Signal SUCCESS');
           } else {
-             print('⚠️ [BG] Could not decline game: missing invitationId');
+             print('⚠️ [BG] Decline missing/invalid ID: $rawId');
           }
         }
       } else if (response.actionId == 'accept') {
-        print('✅ [BG] Accept action matched');
-        // App will handle navigation via Main Isolate
+        print('✅ [BG] ACTION: ACCEPT (Handling in Main Isolate)');
       }
 
       // 4. MANUAL CANCELLATION (Move to end to give time for network)
@@ -220,25 +223,32 @@ class MqttService {
   }
 
   void onNotificationTapped(NotificationResponse response) async {
+    print('🔔 [FG] Notification Response: id=${response.id}, actionId=${response.actionId}');
     if (response.payload != null) {
       try {
         final Map<String, dynamic> data = json.decode(response.payload!);
         final payloadMap = (data['data'] ?? data['payload']) as Map<String, dynamic>?;
         final type = data['type'];
+        print('📦 [FG] Decoded: type=$type, actionId=${response.actionId}');
 
         // Handle Game Invitation Actions
         if (type == 'game_invitation' || type == 'game_challenge') {
           if (response.actionId == 'decline') {
-            final invitationId = payloadMap?['id'];
+            print('❌ [FG] ACTION: DECLINE GAME');
+            final rawId = payloadMap?['id'];
+            final invitationId = int.tryParse(rawId.toString());
             if (invitationId != null) {
+              print('📡 [FG] Sending Decline Signal ID: $invitationId');
               await GameService.respondToInvitation(
                 invitationId: invitationId,
                 action: 'decline',
               );
+              print('✅ [FG] Decline SUCCESS');
             }
             await cancelCallNotification();
             return;
           } else if (response.actionId == 'accept') {
+            print('✅ [FG] ACTION: ACCEPT GAME');
             _emitNotification({
               ...data,
               'action': 'accept',
@@ -250,20 +260,24 @@ class MqttService {
         // Handle Call Invitation Actions
         if (type == 'call_invitation' || type == 'incoming_call') {
           if (response.actionId == 'decline') {
+            print('❌ [FG] ACTION: DECLINE CALL');
             if (payloadMap != null) {
-              final caller = payloadMap['caller'];
+              final caller = payloadMap['caller'] ?? payloadMap['sender'];
               final roomId = payloadMap['room_id']?.toString();
               
               if (caller != null && roomId != null) {
+                  print('📡 [FG] Sending Decline Signal to: $caller');
                   await GameService.declineCall(
                     callerUsername: caller,
                     roomId: roomId,
                   );
+                  print('✅ [FG] Decline SUCCESS');
               }
             }
             await cancelCallNotification();
             return;
           } else if (response.actionId == 'accept') {
+            print('✅ [FG] ACTION: ACCEPT CALL');
             _isInCall = true; // Mark as in-call to prevent further ringing
             
             // Cleanup in background without awaiting
@@ -280,10 +294,13 @@ class MqttService {
         }
         
         // Handle regular notification tap (no action button pressed)
+        print('👉 [FG] Manual Tap - Emitting notification data');
         _emitNotification(data);
       } catch (e) {
-        print('Error parsing notification payload: $e');
+        print('❌ [FG] Error: $e');
       }
+    } else {
+      print('⚠️ [FG] Notification payload is NULL');
     }
   }
 
