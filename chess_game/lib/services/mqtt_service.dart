@@ -511,6 +511,9 @@ class MqttService {
     const int callNotificationId = 999;
 
     await flutterLocalNotificationsPlugin.show(
+      callNotificationId,
+      'Incoming Call',
+      '$caller is calling you...',
       notificationDetails,
       payload: payload,
     );
