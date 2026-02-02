@@ -391,14 +391,14 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
           ),
           ElevatedButton(
             onPressed: () {
+              // IMMEDIATE: Cancel notification
+              MqttService().cancelCallNotification(roomId: roomId);
+              
               _isDialogShowing = false;
               Navigator.of(dialogContext).pop();
 
               // Navigate immediately
               context.go('/call?roomId=$roomId&otherUserName=$caller&isCaller=false');
-
-              // Cleanup in background
-              MqttService().cancelCallNotification(roomId: roomId);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             child: const Text('Accept'),
@@ -436,18 +436,23 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
           actions: [
             TextButton(
               onPressed: () {
+                // IMMEDIATE: Cancel notification
+                MqttService().cancelCallNotification();
+                
                 expiryTimer?.cancel();
                 Navigator.of(dialogContext).pop();
-                MqttService().cancelCallNotification();
+                
                 _declineInvitation(invitationId);
               },
               child: const Text('Decline', style: TextStyle(color: Colors.red)),
             ),
             ElevatedButton(
               onPressed: () {
+                // IMMEDIATE: Cancel notification
+                MqttService().cancelCallNotification();
+                
                 expiryTimer?.cancel();
                 Navigator.of(dialogContext).pop();
-                MqttService().cancelCallNotification();
                 
                 GameService.respondToInvitation(
                   invitationId: invitationId,
