@@ -2030,7 +2030,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(height: 12),
                     Expanded(
                       child: Stack(
                         clipBehavior: Clip.none,

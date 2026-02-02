@@ -33,9 +33,9 @@ void notificationTapBackground(NotificationResponse response) async {
       
       print('🔔 Background Task Action: ${response.actionId}, Room: $roomId');
       
-      // 1. STOP AUDIO & CANCEL NOTIFICATION
+      // 1. STOP AUDIO & UPDATE STATE (Avoid calling cancelCallNotification because of uninitialized plugin)
       final mqtt = MqttService();
-      await mqtt.cancelCallNotification(roomId: roomId);
+      await mqtt.stopAudio(broadcast: false, roomId: roomId);
       
       // 2. DISMISS DIALOGS (Main Isolate)
       FlutterBackgroundService().invoke('dismissCall');
@@ -66,10 +66,13 @@ void notificationTapBackground(NotificationResponse response) async {
         print('🔔 Background Action: Accept tapped. Audio stopped, app will handle navigation.');
       }
 
-      // 3. Manual cancel since we removed cancelNotification: true
+      // 4. Manual cancel using the initialized plugin
       if (response.id != null) {
-        final fln = FlutterLocalNotificationsPlugin();
         await fln.cancel(response.id!);
+      } else {
+         // Fallback: Try to cancel known IDs
+         await fln.cancel(999);
+         await fln.cancel(888);
       }
 
     } catch (e) {
