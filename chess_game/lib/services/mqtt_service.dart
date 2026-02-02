@@ -12,6 +12,9 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse response) async {
+  // Ensure plugins are initialized for this isolate (SharedPreferences, etc.)
+  DartPluginRegistrant.ensureInitialized();
+  
   // Initialize local plugin for this temporary isolate
   final fln = FlutterLocalNotificationsPlugin();
   await fln.initialize(const InitializationSettings(
@@ -475,8 +478,8 @@ class MqttService {
       fullScreenIntent: true,
       category: AndroidNotificationCategory.call,
       visibility: NotificationVisibility.public,
-      ongoing: false,
-      autoCancel: true,
+      ongoing: true, // User requirement: unswipeable until response
+      autoCancel: false, // Prevent swiping away
       playSound: false,
       enableVibration: true,
       ticker: 'Incoming call from $caller', // Ensures notification appears

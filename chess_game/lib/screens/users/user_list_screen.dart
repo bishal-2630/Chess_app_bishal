@@ -94,12 +94,11 @@ class _UserListScreenState extends State<UserListScreen> {
       if (result['success']) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Invitation sent to ${user['username']}'),
-            backgroundColor: Colors.green,
+            content: Text('Invitation sent to ${user['username']}. Waiting for response...'),
+            backgroundColor: Colors.blue,
+            duration: const Duration(seconds: 5),
           ),
         );
-        // Navigate to the game room
-        context.go('/chess?roomId=$roomId&color=w');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
