@@ -1,33 +1,19 @@
 import 'dart:ui';
 import 'dart:convert';
 import 'dart:isolate';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-// @pragma('vm:entry-point') must be on top-level function
+// IMPORTANT: Do NOT import MqttService, DjangoAuthService, or GameService here!
+// This file must remain lean and pure to avoid background crashes.
+
 @pragma('vm:entry-point')
-void notificationTapBackground(dynamic response) async {
-  // Use dynamic to be safe with different version signatures
+void notificationTapBackground(NotificationResponse response) async {
   print('🔔🔔🔔 [BG-FATAL] NOTIFICATION HANDLER WOKE UP!');
   
   try {
-    // Extract data manually if it's a known object or Map
-    String? actionId;
-    String? rawPayload;
-    int? notificationId;
-
-    if (response is Map) {
-      actionId = response['actionId'];
-      rawPayload = response['payload'];
-      notificationId = response['id'];
-    } else {
-      // It's likely a NotificationResponse object
-      try {
-        actionId = response.actionId;
-        rawPayload = response.payload;
-        notificationId = response.id;
-      } catch (e) {
-        print('❌ [BG-FATAL] Object extraction failed: $e');
-      }
-    }
+    final String? actionId = response.actionId;
+    final String? rawPayload = response.payload;
+    final int? notificationId = response.id;
 
     print('🔔 [BG-FATAL] Action: "$actionId", ID: $notificationId');
     print('🔔 [BG-FATAL] Raw Payload: $rawPayload');
@@ -40,23 +26,24 @@ void notificationTapBackground(dynamic response) async {
         ? payload['room_id'].toString() 
         : null;
 
-    print('🔔 [BG-FATAL] Decoded: type=$type, roomId=$roomId');
+    print('🔔 [BG-FATAL] Decoded Data: type=$type, roomId=$roomId');
 
-    // 1. BROADCAST
+    // 1. BROADCAST SIGNAL
+    // We send to both ports to ensure whoever is alive catches it.
     for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
       final SendPort? sendPort = IsolateNameServer.lookupPortByName(portName);
       if (sendPort != null) {
-        print('📡 [BG-FATAL] Signaling port: $portName');
+        print('📡 [BG-FATAL] Dispatching to Port: $portName');
         
-        // Signal 1: Stop Audio
+        // Stop Audio immediately
         sendPort.send({'action': 'stop_audio', 'roomId': roomId});
         sendPort.send({'action': 'dismiss_call'});
 
-        // Signal 2: Handle Decline
+        // If Decline, delegate the network request
         if (actionId == 'decline') {
           if ((type == 'call_invitation' || type == 'incoming_call') && payload != null) {
             final caller = payload['caller'] ?? payload['sender'];
-            print('❌ [BG-FATAL] Dispatching Decline for Call: $caller');
+            print('❌ [BG-FATAL] Signaling DECLINE for Call: $caller');
             sendPort.send({
               'action': 'decline_call',
               'caller': caller,
@@ -64,7 +51,7 @@ void notificationTapBackground(dynamic response) async {
             });
           } else if ((type == 'game_invitation' || type == 'game_challenge') && payload != null) {
              final invitationId = int.tryParse(payload['id'].toString());
-             print('❌ [BG-FATAL] Dispatching Decline for Game: $invitationId');
+             print('❌ [BG-FATAL] Signaling DECLINE for Game: $invitationId');
              if (invitationId != null) {
                sendPort.send({
                  'action': 'respond_invitation',
@@ -75,19 +62,22 @@ void notificationTapBackground(dynamic response) async {
           }
         }
         
-        // Signal 3: Cancel Notification (Main Isolate can do this safely)
+        // Signal notification cleanup
         if (notificationId != null) {
            sendPort.send({'action': 'cancel_notification', 'id': notificationId});
         }
+        // Force cleanup of common notification IDs
         sendPort.send({'action': 'cancel_notification', 'id': 999});
         sendPort.send({'action': 'cancel_notification', 'id': 888});
+        
+        print('✅ [BG-FATAL] Port Signal SENT: $portName');
       } else {
-        print('⚠️ [BG-FATAL] Port NOT FOUND: $portName');
+        print('⚠️ [BG-FATAL] Port Status: NOT FOUND ($portName)');
       }
     }
 
   } catch (e, stack) {
-    print('❌ [BG-FATAL] ERROR: $e');
-    print('❌ [BG-FATAL] STACK: $stack');
+    print('❌ [BG-FATAL] HANDLER CRASH: $e');
+    print('❌ [BG-FATAL] STACKTRACE: $stack');
   }
 }

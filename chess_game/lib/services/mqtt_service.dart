@@ -56,6 +56,12 @@ class MqttService {
       FlutterLocalNotificationsPlugin();
 
   Future<void> initialize() async {
+    if (!isMainIsolate) {
+      print('MQTT: Skipping full initialization in non-main isolate to prevent callback wipe');
+      return;
+    }
+    
+    print('MQTT: Starting Main Isolate Initialization...');
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     
