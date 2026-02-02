@@ -764,7 +764,6 @@ class MqttService {
 
       // Signals already sent via Port Registry above
     }
-    }
   }
 
   void disconnect() {
