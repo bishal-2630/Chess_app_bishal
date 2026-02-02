@@ -8,101 +8,9 @@ import 'dart:ui';
 import 'dart:isolate';
 import 'game_service.dart';
 import 'django_auth_service.dart';
-// Removed flutter_background_service to prevent main-isolate crashes in BG isolates
+import 'notification_handler.dart';
 
-@pragma('vm:entry-point')
-void notificationTapBackground(NotificationResponse response) async {
-  // Ensure plugins are initialized for this isolate (SharedPreferences, etc.)
-  DartPluginRegistrant.ensureInitialized();
-  
-  // Initialize local plugin for this temporary isolate
-  final fln = FlutterLocalNotificationsPlugin();
-  await fln.initialize(const InitializationSettings(
-    android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-  ));
-
-    try {
-      print('🔔 [BG] --- NOTIFICATION ACTION TRIGGERED ---');
-      print('🔔 [BG] ID: ${response.id}');
-      print('🔔 [BG] Action ID: "${response.actionId}"');
-      print('🔔 [BG] Raw Payload: ${response.payload}');
-      print('🔔 [BG] Response Type: ${response.notificationResponseType}');
-      
-      // 0. INITIALIZE AUTH (Don't auto-connect MQTT to avoid isolate race/delays)
-      final authService = DjangoAuthService();
-      await authService.initialize(autoConnectMqtt: false);
-      print('🔐 [BG] Auth Initialized. LoggedIn: ${authService.isLoggedIn}');
-
-      final rawPayload = response.payload;
-      final rawData = rawPayload != null ? json.decode(rawPayload) : null;
-      print('📦 [BG] Decoded Payload: $rawData');
-      
-      // Extract type and payload correctly (check both 'data' and 'payload' keys)
-      final type = rawData != null ? rawData['type'] : null;
-      final payload = rawData != null ? (rawData['data'] ?? rawData['payload']) : null;
-      
-      // Robust String extraction
-      final String? roomId = (payload != null && payload['room_id'] != null) 
-          ? payload['room_id'].toString() 
-          : MqttService._currentCallRoomId;
-      
-      // Try to extract caller/sender
-      final String? person = (payload != null) ? (payload['caller'] ?? payload['sender']) : null;
-      print('👤 [BG] Target: $person, Room: $roomId, Type: $type');
-
-      // 1. STOP AUDIO (Immediate feedback)
-      final mqtt = MqttService();
-      await mqtt.stopAudio(broadcast: false, roomId: roomId);
-      
-      // 2. BROADCAST VIA PORTS (Nuclear option - reaching both Main and BG isolates)
-      print('📡 [BG] Broadcasting dismissal to main/bg ports...');
-      for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
-        final sendPort = IsolateNameServer.lookupPortByName(portName);
-        if (sendPort != null) {
-          sendPort.send({'action': 'stop_audio', 'roomId': roomId});
-          sendPort.send({'action': 'dismiss_call'});
-          print('✅ [BG] Signal sent to $portName');
-        }
-      }
-
-      if (response.actionId == 'decline') {
-        print('❌ [BG] ACTION: DECLINE');
-        if ((type == 'call_invitation' || type == 'incoming_call') && payload != null) {
-          final caller = payload['caller'] ?? payload['sender'];
-          if (caller != null && roomId != null) {
-            print('📡 [BG] Sending Decline Signal for Call to: $caller');
-            await GameService.declineCall(callerUsername: caller, roomId: roomId);
-            print('✅ [BG] Decline Signal SUCCESS');
-          } else {
-            print('⚠️ [BG] Decline missing data: caller=$caller, roomId=$roomId');
-          }
-        } else if ((type == 'game_invitation' || type == 'game_challenge') && payload != null) {
-          final rawId = payload['id'];
-          final invitationId = int.tryParse(rawId.toString());
-          if (invitationId != null) {
-            print('📡 [BG] Sending Decline Signal for Game ID: $invitationId');
-            await GameService.respondToInvitation(invitationId: invitationId, action: 'decline');
-            print('✅ [BG] Decline Signal SUCCESS');
-          } else {
-             print('⚠️ [BG] Decline missing/invalid ID: $rawId');
-          }
-        }
-      } else if (response.actionId == 'accept') {
-        print('✅ [BG] ACTION: ACCEPT (Handling in Main Isolate)');
-      }
-
-      // 4. MANUAL CANCELLATION (Move to end to give time for network)
-      print('🧹 [BG] Cleaning up notifications...');
-      if (response.id != null) {
-        await fln.cancel(response.id!);
-      }
-      await fln.cancel(999);
-      await fln.cancel(888);
-
-    } catch (e) {
-      print('❌ [BG] Error: $e');
-    }
-}
+// No handler here anymore, moved to notification_handler.dart
 
 class MqttService {
   // Static port to prevent GC
@@ -552,13 +460,13 @@ class MqttService {
           'decline',
           'Decline',
           showsUserInterface: false,
-          cancelNotification: true,
+          cancelNotification: false, // Manual cancel at end of BG handler
         ),
         const AndroidNotificationAction(
           'accept',
           'Accept',
           showsUserInterface: true,
-          cancelNotification: true,
+          cancelNotification: false, // Handle in FG/Manual cancel
         ),
       ],
     );
