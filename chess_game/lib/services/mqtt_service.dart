@@ -442,13 +442,13 @@ class MqttService {
           'decline',
           'Decline',
           showsUserInterface: false,
-          cancelNotification: false, // Manual cancel
+          cancelNotification: true, // Auto cancel
         ),
         const AndroidNotificationAction(
           'accept',
           'Accept',
           showsUserInterface: true,
-          cancelNotification: false, // Manual cancel
+          cancelNotification: true, // Auto cancel
         ),
       ],
     );
@@ -493,13 +493,13 @@ class MqttService {
           'decline',
           'Decline',
           showsUserInterface: false,
-          cancelNotification: false,
+          cancelNotification: true,
         ),
         const AndroidNotificationAction(
           'accept',
           'Accept',
           showsUserInterface: true,
-          cancelNotification: false,
+          cancelNotification: true,
         ),
       ],
     );
