@@ -5,6 +5,82 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import './mqtt_service.dart';
 import './django_auth_service.dart';
 
+@pragma('vm:entry-point')
+Future<bool> onIosBackground(ServiceInstance service) async {
+  return true;
+}
+
+@pragma('vm:entry-point')
+void onStart(ServiceInstance service) async {
+  DartPluginRegistrant.ensureInitialized();
+
+  // Check if user is logged in before connecting
+  final authService = DjangoAuthService();
+  await authService.initialize(); // Load from prefs
+
+  // Always register port immediately on start so it can receive stop signals
+  final mqttService = MqttService();
+  mqttService.initializeIsolateListener(isBackground: true);
+
+  if (authService.isLoggedIn) {
+    final username = authService.currentUser?['username'];
+    if (username != null) {
+      print(
+          'Background Service: User logged in, connecting MQTT for $username');
+      await mqttService.initialize();
+      await mqttService.connect(username);
+    }
+  }
+
+  // Use service.on for robust communication from Main Isolate
+  service.on('stopAudio').listen((event) {
+    final roomId = event?['roomId'];
+    print('Background Isolate: NUCLEAR STOP triggered via service (roomId: $roomId)');
+    if (roomId != null) {
+      MqttService().ignoreRoom(roomId);
+    }
+    MqttService().stopAudio(broadcast: false, roomId: roomId);
+  });
+
+  service.on('stopService').listen((event) {
+    service.stopSelf();
+  });
+
+  service.on('cancelNotification').listen((event) async {
+    final id = event?['id'] as int?;
+    if (id != null) {
+      final fln = FlutterLocalNotificationsPlugin();
+      await fln.initialize(const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      ));
+      await fln.cancel(id);
+    }
+  });
+
+  // Keep service alive
+  Timer.periodic(const Duration(seconds: 10), (timer) async {
+    if (service is AndroidServiceInstance) {
+      if (await service.isForegroundService()) {
+        // You can update the tray notification here if needed
+      }
+    }
+
+    // Check connection occasionally
+    final authService = DjangoAuthService();
+    if (authService.isLoggedIn) {
+      final mqtt = MqttService();
+      if (!mqtt.isConnected) {
+        final username = authService.currentUser?['username'];
+        if (username != null) {
+          // Ensure port is registered even if service restarted/woke up
+          mqtt.initializeIsolateListener(isBackground: true);
+          await mqtt.connect(username);
+        }
+      }
+    }
+  });
+}
+
 class BackgroundServiceInstance {
   static Future<void> initializeService() async {
     final service = FlutterBackgroundService();
@@ -44,81 +120,5 @@ class BackgroundServiceInstance {
     );
 
     service.startService();
-  }
-
-  @pragma('vm:entry-point')
-  static Future<bool> onIosBackground(ServiceInstance service) async {
-    return true;
-  }
-
-  @pragma('vm:entry-point')
-  static void onStart(ServiceInstance service) async {
-    DartPluginRegistrant.ensureInitialized();
-
-    // Check if user is logged in before connecting
-    final authService = DjangoAuthService();
-    await authService.initialize(); // Load from prefs
-
-    // Always register port immediately on start so it can receive stop signals
-    final mqttService = MqttService();
-    mqttService.initializeIsolateListener(isBackground: true);
-
-    if (authService.isLoggedIn) {
-      final username = authService.currentUser?['username'];
-      if (username != null) {
-        print(
-            'Background Service: User logged in, connecting MQTT for $username');
-        await mqttService.initialize();
-        await mqttService.connect(username);
-      }
-    }
-
-    // Use service.on for robust communication from Main Isolate
-    service.on('stopAudio').listen((event) {
-      final roomId = event?['roomId'];
-      print('Background Isolate: NUCLEAR STOP triggered via service (roomId: $roomId)');
-      if (roomId != null) {
-        MqttService().ignoreRoom(roomId);
-      }
-      MqttService().stopAudio(broadcast: false, roomId: roomId);
-    });
-
-    service.on('stopService').listen((event) {
-      service.stopSelf();
-    });
-
-    service.on('cancelNotification').listen((event) async {
-      final id = event?['id'] as int?;
-      if (id != null) {
-        final fln = FlutterLocalNotificationsPlugin();
-        await fln.initialize(const InitializationSettings(
-          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-        ));
-        await fln.cancel(id);
-      }
-    });
-
-    // Keep service alive
-    Timer.periodic(const Duration(seconds: 10), (timer) async {
-      if (service is AndroidServiceInstance) {
-        if (await service.isForegroundService()) {
-          // You can update the tray notification here if needed
-        }
-      }
-
-      // Check connection occasionally
-      final authService = DjangoAuthService();
-      if (authService.isLoggedIn) {
-        final mqtt = MqttService();
-        if (!mqtt.isConnected) {
-          final username = authService.currentUser?['username'];
-          if (username != null) {
-            // Ensure port is registered even if service restarted/woke up
-            mqtt.initializeIsolateListener(isBackground: true);
-            await mqtt.connect(username);
-          }
-        }
-      }
-    });
   }
 }

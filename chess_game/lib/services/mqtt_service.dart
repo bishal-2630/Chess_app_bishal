@@ -22,7 +22,11 @@ void notificationTapBackground(NotificationResponse response) async {
   ));
 
     try {
-      print('🔔 [BG] START: id=${response.id}, actionId=${response.actionId}');
+      print('🔔 [BG] --- NOTIFICATION ACTION TRIGGERED ---');
+      print('🔔 [BG] ID: ${response.id}');
+      print('🔔 [BG] Action ID: "${response.actionId}"');
+      print('🔔 [BG] Raw Payload: ${response.payload}');
+      print('🔔 [BG] Response Type: ${response.notificationResponseType}');
       
       // 0. INITIALIZE AUTH (Don't auto-connect MQTT to avoid isolate race/delays)
       final authService = DjangoAuthService();
@@ -223,7 +227,11 @@ class MqttService {
   }
 
   void onNotificationTapped(NotificationResponse response) async {
-    print('🔔 [FG] Notification Response: id=${response.id}, actionId=${response.actionId}');
+    print('🔔 [FG] --- NOTIFICATION ACTION TRIGGERED ---');
+    print('🔔 [FG] ID: ${response.id}');
+    print('🔔 [FG] Action ID: "${response.actionId}"');
+    print('🔔 [FG] Raw Payload: ${response.payload}');
+    
     if (response.payload != null) {
       try {
         final Map<String, dynamic> data = json.decode(response.payload!);
