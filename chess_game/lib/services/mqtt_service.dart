@@ -8,7 +8,7 @@ import 'dart:ui';
 import 'dart:isolate';
 import 'game_service.dart';
 import 'django_auth_service.dart';
-import 'package:flutter_background_service/flutter_background_service.dart';
+// Removed flutter_background_service to prevent main-isolate crashes in BG isolates
 
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse response) async {
@@ -54,13 +54,15 @@ void notificationTapBackground(NotificationResponse response) async {
       final mqtt = MqttService();
       await mqtt.stopAudio(broadcast: false, roomId: roomId);
       
-      // 2. DISMISS DIALOGS (Main Isolate)
-      FlutterBackgroundService().invoke('dismissCall');
-
-      // 3. BROADCAST VIA PORTS (Fallback)
+      // 2. BROADCAST VIA PORTS (Nuclear option - reaching both Main and BG isolates)
+      print('📡 [BG] Broadcasting dismissal to main/bg ports...');
       for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
         final sendPort = IsolateNameServer.lookupPortByName(portName);
-        sendPort?.send({'action': 'stop_audio', 'roomId': roomId});
+        if (sendPort != null) {
+          sendPort.send({'action': 'stop_audio', 'roomId': roomId});
+          sendPort.send({'action': 'dismiss_call'});
+          print('✅ [BG] Signal sent to $portName');
+        }
       }
 
       if (response.actionId == 'decline') {
@@ -203,10 +205,16 @@ class MqttService {
     await androidPlugin?.createNotificationChannel(challengeChannel);
     await androidPlugin?.createNotificationChannel(callChannel);
 
-    // Request notification permissions for Android 13+ (API 33+)
-    final bool? permissionGranted = await androidPlugin?.requestNotificationsPermission();
-    if (permissionGranted == false) {
-      print('MQTT: Notification permission denied');
+    // Request notification permissions ONLY in Main Isolate (requires Activity)
+    final isBackground = IsolateNameServer.lookupPortByName('chess_game_bg_port') != null;
+    if (!isBackground) {
+      print('MQTT: Main Isolate detected, requesting permissions...');
+      final bool? permissionGranted = await androidPlugin?.requestNotificationsPermission();
+      if (permissionGranted == false) {
+        print('MQTT: Notification permission denied');
+      }
+    } else {
+      print('MQTT: Background Isolate detected, skipping permission request');
     }
   }
   
@@ -217,11 +225,22 @@ class MqttService {
     IsolateNameServer.registerPortWithName(_listenerPort.sendPort, portName);
     
     _listenerPort.listen((message) async {
+      print('🔔 Isolate ($portName) received message: $message');
       if (message == 'stop_audio') {
         await stopAudio(broadcast: false);
-      } else if (message is Map && message['action'] == 'stop_audio') {
-        final roomId = message['roomId'];
-        await stopAudio(broadcast: false, roomId: roomId);
+      } else if (message is Map) {
+        if (message['action'] == 'stop_audio') {
+          final roomId = message['roomId'];
+          await stopAudio(broadcast: false, roomId: roomId);
+        } else if (message['action'] == 'dismiss_call') {
+          // Internal signal to clear UI or stop ringing
+          _notificationController.add({'type': 'dismiss_call'});
+        } else if (message['action'] == 'cancel_notification') {
+          final id = message['id'];
+          if (id != null) {
+            await flutterLocalNotificationsPlugin.cancel(id);
+          }
+        }
       }
     });
   }
@@ -603,10 +622,15 @@ class MqttService {
     await flutterLocalNotificationsPlugin.cancel(888);
     await flutterLocalNotificationsPlugin.cancel(999);
     
-    // Broadcast cancellation to other isolates (especially Background Service)
-    FlutterBackgroundService().invoke('cancelNotification', {'id': 1000}); // Clear all just in case
-    FlutterBackgroundService().invoke('cancelNotification', {'id': 999});
-    FlutterBackgroundService().invoke('cancelNotification', {'id': 888});
+    // Broadcast cancellation to other isolates
+    for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
+      final sendPort = IsolateNameServer.lookupPortByName(portName);
+      if (sendPort != null) {
+        sendPort.send({'action': 'cancel_notification', 'id': 999});
+        sendPort.send({'action': 'cancel_notification', 'id': 888});
+        sendPort.send({'action': 'dismiss_call'});
+      }
+    }
     
     // Prioritize the passed roomId, then the current one
     final String? roomIdToStop = roomId ?? _currentCallRoomId;
@@ -738,13 +762,8 @@ class MqttService {
         }
       }
 
-      // Signal via Background Service (Alternative path)
-      try {
-        FlutterBackgroundService().invoke('stopAudio', {'roomId': roomId});
-        FlutterBackgroundService().invoke('dismissCall');
-      } catch (e) {
-        // Service might not be running in this context
-      }
+      // Signals already sent via Port Registry above
+    }
     }
   }
 

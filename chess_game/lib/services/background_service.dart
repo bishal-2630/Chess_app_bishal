@@ -32,29 +32,29 @@ void onStart(ServiceInstance service) async {
     }
   }
 
-  // Use service.on for robust communication from Main Isolate
-  service.on('stopAudio').listen((event) {
-    final roomId = event?['roomId'];
-    print('Background Isolate: NUCLEAR STOP triggered via service (roomId: $roomId)');
-    if (roomId != null) {
-      MqttService().ignoreRoom(roomId);
+  // Standardized signaling via MqttService stream
+  mqttService.notifications.listen((data) async {
+    final type = data['type'];
+    final payload = data['data'] ?? data['payload'];
+
+    if (type == 'stop_audio') {
+      final roomId = payload != null ? payload['room_id'] : null;
+      print('Background Isolate: Standard signal received (stop_audio). RoomId: $roomId');
+      if (roomId != null) {
+        MqttService().ignoreRoom(roomId);
+      }
+      MqttService().stopAudio(broadcast: false, roomId: roomId);
+    } else if (type == 'cancel_notification') {
+       final id = payload?['id'];
+       if (id != null) {
+         final fln = FlutterLocalNotificationsPlugin();
+         await fln.cancel(id);
+       }
     }
-    MqttService().stopAudio(broadcast: false, roomId: roomId);
   });
 
   service.on('stopService').listen((event) {
     service.stopSelf();
-  });
-
-  service.on('cancelNotification').listen((event) async {
-    final id = event?['id'] as int?;
-    if (id != null) {
-      final fln = FlutterLocalNotificationsPlugin();
-      await fln.initialize(const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-      ));
-      await fln.cancel(id);
-    }
   });
 
   // Keep service alive

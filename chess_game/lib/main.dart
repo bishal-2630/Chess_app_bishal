@@ -152,29 +152,12 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
     _handleInitialNotification();
     _listenForNotifications();
     _checkInitialAuth();
-    _setupServiceSignals();
+    _setupGlobalSignals();
   }
 
-  void _setupServiceSignals() {
-    final service = FlutterBackgroundService();
-    
-    // Listen for stopAudio from other isolates
-    service.on('stopAudio').listen((event) {
-      final roomId = event?['roomId'];
-      if (roomId != null) {
-        MqttService().ignoreRoom(roomId);
-      }
-      MqttService().stopAudio(broadcast: false, roomId: roomId);
-    });
-    
-    // Listen for dismissCall from other isolates
-    service.on('dismissCall').listen((event) {
-      _dismissCurrentDialog();
-    });
-  }
-
-  void _dismissCurrentDialog() {
-    // Dialogs are disabled, but keeping this for potential manual dismiss signals from service
+  void _setupGlobalSignals() {
+    // Signals (stopAudio, dismiss_call, etc.) are already routed 
+    // through mqttService.notifications stream which we listen to in _listenForNotifications()
   }
 
   Future<void> _handleInitialNotification() async {
@@ -226,9 +209,10 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
     final action = data['action'];
     final payload = data['data'] ?? data['payload'];
 
-    if (type == 'call_ended' || type == 'call_declined' || type == 'call_cancelled') {
+    if (type == 'call_ended' || type == 'call_declined' || type == 'call_cancelled' || type == 'dismiss_call') {
       // Stop audio immediately as this is a termination event
-      final roomId = payload['room_id'];
+      final roomId = payload != null ? payload['room_id'] : null;
+      print('🧹 [Main] Termination signal received ($type). Stopping audio...');
       MqttService().stopAudio(broadcast: true, roomId: roomId);
     } else if (type == 'call_invitation') {
       if (action == 'accept') {

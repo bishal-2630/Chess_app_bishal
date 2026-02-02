@@ -19,8 +19,12 @@ class DjangoAuthService {
   static const String _refreshKey = 'refresh_token';
   static const String _userKey = 'user_data';
 
-  final CookieManager _cookieManager = CookieManager.instance();
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
+  // Lazy-loaded components (UI only)
+  CookieManager? __cookieManager;
+  CookieManager get _cookieManager => __cookieManager ??= CookieManager.instance();
+
+  GoogleSignIn? __googleSignIn;
+  GoogleSignIn get _googleSignIn => __googleSignIn ??= GoogleSignIn(
     serverClientId:
         '764791811000-uhnrqvpfe4euoaff3kmiekrc7p7c4obk.apps.googleusercontent.com',
   );
