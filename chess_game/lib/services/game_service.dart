@@ -28,6 +28,15 @@ class GameService {
   }) async {
     headers ??= await _getAuthHeaders();
     
+    print('🌐 [API] $method $url');
+    // Don't log full body for security, but log the keys
+    if (body != null) {
+      try {
+        final decoded = json.decode(body as String);
+        print('📦 [API] Keys: ${decoded.keys.toList()}');
+      } catch (_) {}
+    }
+
     http.Response response;
     try {
       if (method == 'POST') {
@@ -35,6 +44,8 @@ class GameService {
       } else {
         response = await http.get(Uri.parse(url), headers: headers);
       }
+
+      print('📡 [API] Response: ${response.statusCode}');
 
       // Check for token expiration (401)
       if (response.statusCode == 401 && retryCount < 1) {
@@ -48,6 +59,7 @@ class GameService {
       }
       return response;
     } catch (e) {
+      print('❌ [API] Error: $e');
       rethrow;
     }
   }

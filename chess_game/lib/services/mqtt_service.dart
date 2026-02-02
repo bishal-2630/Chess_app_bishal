@@ -21,13 +21,16 @@ void notificationTapBackground(NotificationResponse response) async {
     android: AndroidInitializationSettings('@mipmap/ic_launcher'),
   ));
 
-  try {
+    try {
+      print('🔔 [BG] Notification Response: id=${response.id}, actionId=${response.actionId}');
+      
       // 0. INITIALIZE AUTH (Crucial for GameService calls in background isolate)
       final authService = DjangoAuthService();
       await authService.initialize();
 
       final rawPayload = response.payload;
       final rawData = rawPayload != null ? json.decode(rawPayload) : null;
+      print('📦 [BG] Decoded Payload: $rawData');
       
       // Extract type and payload correctly (check both 'data' and 'payload' keys)
       final type = rawData != null ? rawData['type'] : null;
@@ -38,44 +41,57 @@ void notificationTapBackground(NotificationResponse response) async {
           ? payload['room_id'].toString() 
           : MqttService._currentCallRoomId;
       
-      // 1. IMMEDIATE CANCELLATION (Fix for stuck notifications)
-      if (response.id != null) {
-        await fln.cancel(response.id!);
-      }
-      await fln.cancel(999);
-      await fln.cancel(888);
-      
-      // 2. STOP AUDIO & UPDATE STATE
+      // Try to extract caller/sender
+      final String? person = (payload != null) ? (payload['caller'] ?? payload['sender']) : null;
+      print('👤 [BG] Target: $person, Room: $roomId, Type: $type');
+
+      // 1. STOP AUDIO (Immediate feedback)
       final mqtt = MqttService();
       await mqtt.stopAudio(broadcast: false, roomId: roomId);
       
-      // 3. DISMISS DIALOGS (Main Isolate)
+      // 2. DISMISS DIALOGS (Main Isolate)
       FlutterBackgroundService().invoke('dismissCall');
 
-      // 4. BROADCAST VIA PORTS (Fallback)
+      // 3. BROADCAST VIA PORTS (Fallback)
       for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
         final sendPort = IsolateNameServer.lookupPortByName(portName);
         sendPort?.send({'action': 'stop_audio', 'roomId': roomId});
       }
 
       if (response.actionId == 'decline') {
+        print('❌ [BG] Executing DECLINE...');
         if ((type == 'call_invitation' || type == 'incoming_call') && payload != null) {
-          final caller = payload['caller'];
+          final caller = payload['caller'] ?? payload['sender'];
           if (caller != null && roomId != null) {
             await GameService.declineCall(callerUsername: caller, roomId: roomId);
+            print('✅ [BG] Decline signal SENT for call');
+          } else {
+            print('⚠️ [BG] Could not decline call: missing caller ($caller) or roomId ($roomId)');
           }
         } else if ((type == 'game_invitation' || type == 'game_challenge') && payload != null) {
           final invitationId = payload['id'];
           if (invitationId != null) {
             await GameService.respondToInvitation(invitationId: invitationId, action: 'decline');
+            print('✅ [BG] Decline signal SENT for game');
+          } else {
+             print('⚠️ [BG] Could not decline game: missing invitationId');
           }
         }
       } else if (response.actionId == 'accept') {
+        print('✅ [BG] Accept action matched');
         // App will handle navigation via Main Isolate
       }
 
+      // 4. MANUAL CANCELLATION (Move to end to give time for network)
+      print('🧹 [BG] Cleaning up notifications...');
+      if (response.id != null) {
+        await fln.cancel(response.id!);
+      }
+      await fln.cancel(999);
+      await fln.cancel(888);
+
     } catch (e) {
-      print('Background Action Error: $e');
+      print('❌ [BG] Error: $e');
     }
 }
 
@@ -441,13 +457,13 @@ class MqttService {
           'decline',
           'Decline',
           showsUserInterface: false,
-          cancelNotification: true, // Auto cancel
+          cancelNotification: false, // Manual cancel at end of handler
         ),
         const AndroidNotificationAction(
           'accept',
           'Accept',
           showsUserInterface: true,
-          cancelNotification: true, // Auto cancel
+          cancelNotification: false, // Auto cancel is ok for foreground
         ),
       ],
     );
