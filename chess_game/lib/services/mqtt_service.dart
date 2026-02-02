@@ -63,11 +63,19 @@ class MqttService {
       android: initializationSettingsAndroid,
     );
     
-    await flutterLocalNotificationsPlugin.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: onNotificationTapped,
-      onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
-    );
+    if (isMainIsolate) {
+      print('MQTT: Registering notification callbacks in Main Isolate');
+      await flutterLocalNotificationsPlugin.initialize(
+        initializationSettings,
+        onDidReceiveNotificationResponse: onNotificationTapped,
+        onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
+      );
+    } else {
+      print('MQTT: Skipping notification callback registration in non-main isolate');
+      await flutterLocalNotificationsPlugin.initialize(
+        initializationSettings,
+      );
+    }
 
     // Create High Priority Channels
     const AndroidNotificationChannel challengeChannel = AndroidNotificationChannel(

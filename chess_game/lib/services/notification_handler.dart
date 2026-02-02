@@ -1,45 +1,62 @@
 import 'dart:ui';
 import 'dart:convert';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'dart:isolate';
 
-// IMPORTANT: Do NOT import MqttService, DjangoAuthService, or GameService here.
-// Loading those classes triggers plugin registration that crashes background isolates.
-
+// @pragma('vm:entry-point') must be on top-level function
 @pragma('vm:entry-point')
-void notificationTapBackground(NotificationResponse response) async {
-  // We use a local instance of the plugin for cancellation only
-  final fln = FlutterLocalNotificationsPlugin();
-  await fln.initialize(const InitializationSettings(
-    android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-  ));
-
-  print('🔔 [BG-SIGNAL] --- NOTIFICATION ACTION TRIGGERED ---');
-  print('🔔 [BG-SIGNAL] Action ID: "${response.actionId}"');
-
+void notificationTapBackground(dynamic response) async {
+  // Use dynamic to be safe with different version signatures
+  print('🔔🔔🔔 [BG-FATAL] NOTIFICATION HANDLER WOKE UP!');
+  
   try {
-    final rawPayload = response.payload;
-    final rawData = rawPayload != null ? json.decode(rawPayload) : null;
-    if (rawData == null) return;
+    // Extract data manually if it's a known object or Map
+    String? actionId;
+    String? rawPayload;
+    int? notificationId;
 
+    if (response is Map) {
+      actionId = response['actionId'];
+      rawPayload = response['payload'];
+      notificationId = response['id'];
+    } else {
+      // It's likely a NotificationResponse object
+      try {
+        actionId = response.actionId;
+        rawPayload = response.payload;
+        notificationId = response.id;
+      } catch (e) {
+        print('❌ [BG-FATAL] Object extraction failed: $e');
+      }
+    }
+
+    print('🔔 [BG-FATAL] Action: "$actionId", ID: $notificationId');
+    print('🔔 [BG-FATAL] Raw Payload: $rawPayload');
+
+    if (rawPayload == null) return;
+    final Map<String, dynamic> rawData = json.decode(rawPayload);
     final type = rawData['type'];
     final payload = rawData['data'] ?? rawData['payload'];
     final String? roomId = (payload != null && payload['room_id'] != null) 
         ? payload['room_id'].toString() 
         : null;
 
-    // 1. BROADCAST TO ALL PORTS
-    // The Main Isolate or the Background Service Isolate will catch these and do the actual work.
+    print('🔔 [BG-FATAL] Decoded: type=$type, roomId=$roomId');
+
+    // 1. BROADCAST
     for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
-      final sendPort = IsolateNameServer.lookupPortByName(portName);
+      final SendPort? sendPort = IsolateNameServer.lookupPortByName(portName);
       if (sendPort != null) {
-        // Stop Audio
+        print('📡 [BG-FATAL] Signaling port: $portName');
+        
+        // Signal 1: Stop Audio
         sendPort.send({'action': 'stop_audio', 'roomId': roomId});
         sendPort.send({'action': 'dismiss_call'});
 
-        // If Decline, tell the port to send the signal
-        if (response.actionId == 'decline') {
+        // Signal 2: Handle Decline
+        if (actionId == 'decline') {
           if ((type == 'call_invitation' || type == 'incoming_call') && payload != null) {
             final caller = payload['caller'] ?? payload['sender'];
+            print('❌ [BG-FATAL] Dispatching Decline for Call: $caller');
             sendPort.send({
               'action': 'decline_call',
               'caller': caller,
@@ -47,6 +64,7 @@ void notificationTapBackground(NotificationResponse response) async {
             });
           } else if ((type == 'game_invitation' || type == 'game_challenge') && payload != null) {
              final invitationId = int.tryParse(payload['id'].toString());
+             print('❌ [BG-FATAL] Dispatching Decline for Game: $invitationId');
              if (invitationId != null) {
                sendPort.send({
                  'action': 'respond_invitation',
@@ -56,19 +74,20 @@ void notificationTapBackground(NotificationResponse response) async {
              }
           }
         }
-        print('✅ [BG-SIGNAL] Dispatched to $portName');
+        
+        // Signal 3: Cancel Notification (Main Isolate can do this safely)
+        if (notificationId != null) {
+           sendPort.send({'action': 'cancel_notification', 'id': notificationId});
+        }
+        sendPort.send({'action': 'cancel_notification', 'id': 999});
+        sendPort.send({'action': 'cancel_notification', 'id': 888});
+      } else {
+        print('⚠️ [BG-FATAL] Port NOT FOUND: $portName');
       }
     }
 
-    // 2. CLEANUP NOTIFICATION
-    if (response.id != null) {
-      await fln.cancel(response.id!);
-    }
-    // Nuclear clear
-    await fln.cancel(999);
-    await fln.cancel(888);
-
-  } catch (e) {
-    print('❌ [BG-SIGNAL] Error: $e');
+  } catch (e, stack) {
+    print('❌ [BG-FATAL] ERROR: $e');
+    print('❌ [BG-FATAL] STACK: $stack');
   }
 }
