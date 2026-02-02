@@ -60,11 +60,9 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   void _startCallTimeout() {
-    print("⏰ Starting 30s call timeout timer...");
     _callTimeoutTimer = Timer(const Duration(seconds: 30), () {
       if (!mounted || _inCall || _isExiting) return;
       
-      print("⏰ Call timed out (no answer). Cancelling...");
       _isExiting = true; // Prevent multiple exists
 
       // Cancel call via backend
@@ -143,7 +141,6 @@ class _CallScreenState extends State<CallScreen> {
     };
 
     _signalingService.onCallAccepted = () async {
-      print("✅ Call accepted by peer");
       await MqttService().stopAudio(broadcast: true);
       setState(() {
         _inCall = true;

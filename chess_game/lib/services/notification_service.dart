@@ -26,7 +26,6 @@ class NotificationService {
 
   Future<void> connect() async {
     if (_channel != null) {
-      print('🔔 Notification service already connected');
       return;
     }
 
@@ -51,18 +50,17 @@ class NotificationService {
         (message) {
           try {
             final data = json.decode(message) as Map<String, dynamic>;
-            print('🔔 Received notification: ${data['type']}');
             _notificationController.add(data);
           } catch (e) {
             print('🔔 Error parsing notification: $e');
           }
         },
         onError: (error) {
-          print('🔔 Notification service error: $error');
+          print('Notification service error: $error');
           _notificationController.addError(error);
         },
         onDone: () {
-          print('🔔 Notification service disconnected');
+          print('Notification service disconnected');
           _channel = null;
         },
       );

@@ -374,9 +374,8 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
         actions: [
           TextButton(
             onPressed: () async {
-              print('📞 UI: Decline button pressed');
-              
-              // IMMEDIATE: Stop audio FIRST before anything else
+              // IMMEDIATE: Cancel notification & Stop audio
+              MqttService().cancelCallNotification(roomId: roomId);
               await MqttService().stopAudio(broadcast: true, roomId: roomId);
               
               _isDialogShowing = false;
@@ -387,15 +386,11 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
                 callerUsername: caller,
                 roomId: roomId,
               );
-              
-              // Then cleanup notification
-              MqttService().cancelCallNotification(roomId: roomId);
             },
             child: const Text('Decline', style: TextStyle(color: Colors.red)),
           ),
           ElevatedButton(
             onPressed: () {
-              print('📞 UI: Accept button pressed');
               _isDialogShowing = false;
               Navigator.of(dialogContext).pop();
 

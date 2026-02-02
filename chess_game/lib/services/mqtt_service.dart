@@ -12,8 +12,6 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse response) async {
-  print('🔔 Notification Action: ${response.actionId}');
-  
   // Initialize local plugin for this temporary isolate
   final fln = FlutterLocalNotificationsPlugin();
   await fln.initialize(const InitializationSettings(
@@ -31,9 +29,15 @@ void notificationTapBackground(NotificationResponse response) async {
           ? payload['room_id'].toString() 
           : MqttService._currentCallRoomId;
       
-      print('🔔 Background Task Action: ${response.actionId}, Room: $roomId');
+      // 0. IMMEDIATE CANCELLATION (Fix for stuck notifications)
+      if (response.id != null) {
+        await fln.cancel(response.id!);
+      } else {
+         await fln.cancel(999);
+         await fln.cancel(888);
+      }
       
-      // 1. STOP AUDIO & UPDATE STATE (Avoid calling cancelCallNotification because of uninitialized plugin)
+      // 1. STOP AUDIO & UPDATE STATE
       final mqtt = MqttService();
       await mqtt.stopAudio(broadcast: false, roomId: roomId);
       
@@ -50,33 +54,20 @@ void notificationTapBackground(NotificationResponse response) async {
         if (type == 'call_invitation' && payload != null) {
           final caller = payload['caller'];
           if (caller != null && roomId != null) {
-            print('❌ Background Action: Declining call from $caller');
             await GameService.declineCall(callerUsername: caller, roomId: roomId);
           }
         } else if (type == 'game_invitation' && payload != null) {
           final invitationId = payload['id'];
           if (invitationId != null) {
-            print('❌ Background Action: Declining game invite $invitationId');
             await GameService.respondToInvitation(invitationId: invitationId, action: 'decline');
           }
         }
       } else if (response.actionId == 'accept') {
-        // For calls, we just stop audio and let the main app handle navigation.
-        // For game invites, we also stop audio and let the main app handle navigation.
-        print('🔔 Background Action: Accept tapped. Audio stopped, app will handle navigation.');
-      }
-
-      // 4. Manual cancel using the initialized plugin
-      if (response.id != null) {
-        await fln.cancel(response.id!);
-      } else {
-         // Fallback: Try to cancel known IDs
-         await fln.cancel(999);
-         await fln.cancel(888);
+        // App will handle navigation.
       }
 
     } catch (e) {
-      print('❌ Background Action Error: $e');
+      print('Background Action Error: $e');
     }
 }
 
@@ -183,10 +174,8 @@ class MqttService {
 
     // Request notification permissions for Android 13+ (API 33+)
     final bool? permissionGranted = await androidPlugin?.requestNotificationsPermission();
-    if (permissionGranted == true) {
-      print('✅ MQTT: Notification permission granted');
-    } else {
-      print('⚠️ MQTT: Notification permission denied or not requested');
+    if (permissionGranted == false) {
+      print('MQTT: Notification permission denied');
     }
   }
   
@@ -197,7 +186,6 @@ class MqttService {
     IsolateNameServer.registerPortWithName(_listenerPort.sendPort, portName);
     
     _listenerPort.listen((message) async {
-      print("🔔 [$portName] Isolate received: $message");
       if (message == 'stop_audio') {
         await stopAudio(broadcast: false);
       } else if (message is Map && message['action'] == 'stop_audio') {
@@ -208,9 +196,6 @@ class MqttService {
   }
 
   void onNotificationTapped(NotificationResponse response) async {
-    print('🔔 Notification tapped: ${response.actionId}');
-    print('🔔 Payload: ${response.payload}');
-    
     if (response.payload != null) {
       try {
         final data = json.decode(response.payload!);
@@ -280,7 +265,6 @@ class MqttService {
         }
         
         // Handle regular notification tap (no action body)
-        print('👆 User tapped notification body');
         _emitNotification(data);
       } catch (e) {
         print('Error parsing notification payload: $e');
@@ -299,7 +283,6 @@ class MqttService {
 
     _currentUsername = username;
     final clientIdentifier = 'flutter_client_${username}_${DateTime.now().millisecondsSinceEpoch}';
-    print('🔌 MQTT: Creating client with ID: $clientIdentifier');
     client = MqttServerClient(broker, clientIdentifier);
     client!.port = port;
     client!.keepAlivePeriod = 20;
@@ -334,19 +317,14 @@ class MqttService {
       _subscribeToNotifications(username);
       _listen();
     } else {
-      print('❌ MQTT: Connection failed - state is ${client!.connectionStatus!.state}');
+      print('MQTT: Connection failed - state is ${client!.connectionStatus!.state}');
       disconnect();
     }
-    
-    print('🔌 MQTT connect call completed');
   }
 
   void _subscribeToNotifications(String username) {
     final topic = 'chess/user/$username/notifications';
-    print('📬 MQTT: Subscribing to topic: $topic');
-    print('📬 MQTT: Username for subscription: $username');
     client!.subscribe(topic, MqttQos.atLeastOnce);
-    print('📬 MQTT: Subscribe request sent for $topic');
   }
 
   void _listen() {
@@ -356,35 +334,27 @@ class MqttService {
     }
     
     _isListening = true;
-    print('👂 MQTT: Setting up message listener');
     client!.updates!.listen((List<MqttReceivedMessage<MqttMessage?>>? c) {
       final MqttPublishMessage recMess = c![0].payload as MqttPublishMessage;
       final String topic = c[0].topic;
       final String pt =
           MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
 
-      print('📨 MQTT: Message received on topic: $topic');
-      print('📨 MQTT: Raw message payload: $pt');
+      print('MQTT: Message received on topic: $topic');
       try {
         final data = json.decode(pt);
-        print('📨 MQTT: Parsed message type: ${data['type']}');
         _handleNotification(data);
       } catch (e) {
-        print('❌ MQTT: Error parsing message: $e');
-        print('❌ MQTT: Failed payload was: $pt');
+        print('MQTT: Error parsing message: $e');
       }
     });
   }
 
   Future<void> _handleNotification(Map<String, dynamic> data) async {
-    print('🔔 MQTT: _handleNotification called with data: $data');
     final type = data['type'];
     final payload = data['payload'];
 
-    print('🔔 MQTT: Notification type: $type');
-
     if (type == 'game_invitation') {
-      print('🔔 MQTT: Showing game invitation notification');
       _showGameNotification(
         'New Challenge!',
         '${payload['sender']['username']} has challenged you to a game.',
@@ -395,23 +365,19 @@ class MqttService {
       
       // Check if we already suspended/declined this call
       if (_declinedRoomIds.contains(roomId) || _isMutedWindow) {
-        print('🚫 MQTT: Ignoring call invitation (declined or in mute window)');
         return;
       }
       
       // Check if we are already in a call
       if (_isInCall) {
-        print('🚫 MQTT: Ignoring call invitation - already in a call');
         return;
       }
       
       // Check if we are already ringing for this exact room
       if (_isPlaying && _currentCallRoomId == roomId) {
-        print('⚠️ MQTT: Already ringing for room $roomId, skipping duplicate notification');
         return;
       }
 
-      print('🔔 MQTT: Showing call invitation notification');
       _currentCallRoomId = roomId;
       
       // RESTORED: Play sound immediately
@@ -422,10 +388,8 @@ class MqttService {
         roomId,
         json.encode(data),
       );
-      print('✅ MQTT: Call notification sent to system');
     } else if (type == 'call_declined') {
       final String? roomId = payload != null ? payload['room_id']?.toString() : null;
-      print('🔔 MQTT: Remote termination: $type for room: $roomId');
       
       if (roomId != null) {
         ignoreRoom(roomId);
@@ -440,7 +404,6 @@ class MqttService {
     } else if (type == 'call_cancelled') {
         final String? roomId = payload != null ? payload['room_id']?.toString() : null;
         final String? sender = payload != null ? payload['sender'] : null; // sender is the Caller
-        print('🔔 MQTT: Call Cancelled (Missed Call) for room: $roomId');
 
         if (roomId != null) {
           ignoreRoom(roomId);
@@ -454,7 +417,6 @@ class MqttService {
         }
     }
     
-    print('🔔 MQTT: Broadcasting event type: $type');
     _notificationController.add(data);
   }
 
@@ -506,8 +468,6 @@ class MqttService {
   }
 
   Future<void> _showCallNotification(String caller, String roomId, String payload) async {
-    print('📱 Creating call notification for $caller');
-    
     // Create notification with action buttons
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'chess_incoming_calls_v6', // v6
@@ -551,19 +511,12 @@ class MqttService {
     const int callNotificationId = 999;
 
     await flutterLocalNotificationsPlugin.show(
-      callNotificationId,
-      'Incoming Call',
-      '$caller is calling you...',
       notificationDetails,
       payload: payload,
     );
-    
-    print('✅ Call notification shown for $caller');
   }
 
   Future<void> _showMissedCallNotification(String caller) async {
-    print('📱 Creating Missed Call notification for $caller');
-    
     // Create notification channel for missed calls if not exists
     // (Ideally create this in initialize(), but details here work too)
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
@@ -596,10 +549,8 @@ class MqttService {
   void ignoreRoom(String? roomId) {
     if (roomId != null) {
       _declinedRoomIds.add(roomId);
-      print('🚫 MQTT: Added $roomId to ignored list (cross-isolate)');
       Future.delayed(const Duration(minutes: 1), () {
         _declinedRoomIds.remove(roomId);
-        print('🚫 MQTT: Removed $roomId from ignored list (expired)');
       });
     }
   }
@@ -614,12 +565,10 @@ class MqttService {
     
     if (roomIdToStop != null) {
       _declinedRoomIds.add(roomIdToStop);
-      print('🚫 MQTT: Added $roomIdToStop to declined list');
       
       // Auto-clear after 1 minute
       Future.delayed(const Duration(minutes: 1), () {
         _declinedRoomIds.remove(roomIdToStop);
-        print('🚫 MQTT: Removed $roomIdToStop from declined list (expired)');
       });
 
       if (_currentCallRoomId == roomIdToStop) {
@@ -651,8 +600,7 @@ class MqttService {
   }
 
   void onSubscribed(String topic) {
-    print('✅ MQTT: Successfully subscribed to topic: $topic');
-    print('✅ MQTT: Now listening for messages on: $topic');
+    // Subscribed
   }
 
   Future<void> playSound(String fileName, {String? roomId}) async {
@@ -680,7 +628,6 @@ class MqttService {
     _isAudioLoading = true;
 
     try {
-      print('MQTT [$isolateName]: Playing $fileName');
       
       // Reset player mode
       await _audioPlayer.setReleaseMode(ReleaseMode.loop).catchError((_) {});
@@ -708,58 +655,32 @@ class MqttService {
     }
   }
 
+  Future<void> _handleAudioStop(String? roomId, {bool broadcast = false}) async {
+    // Renamed internal or usage? No, keeping stopAudio but cleaning up.
+  }
+  
   Future<void> stopAudio({bool broadcast = false, String? roomId}) async {
-    final isolateName = Isolate.current.debugName ?? 'unknown';
-    
-    print('🛑 MQTT [$isolateName]: ===== STOP AUDIO CALLED =====');
-    print('🛑 MQTT [$isolateName]: Room: $roomId, Broadcast: $broadcast');
-    print('🛑 MQTT [$isolateName]: Current _isPlaying: $_isPlaying');
-    print('🛑 MQTT [$isolateName]: Current _isMutedWindow: $_isMutedWindow');
-    
     _isPlaying = false; 
     _isMutedWindow = true; // Start mute window
 
     if (roomId != null) {
       _declinedRoomIds.add(roomId);
-      print('🛑 MQTT [$isolateName]: Added $roomId to declined list');
     }
     _currentCallRoomId = null; 
 
     try {
-      print('🛑 MQTT [$isolateName]: Executing pause...');
-      await _audioPlayer.pause().catchError((e) {
-        print('🛑 MQTT [$isolateName]: Pause error: $e');
-      });
-      
-      print('🛑 MQTT [$isolateName]: Executing stop...');
-      await _audioPlayer.stop().catchError((e) {
-        print('🛑 MQTT [$isolateName]: Stop error: $e');
-      });
-      
-      print('🛑 MQTT [$isolateName]: Setting volume to 0...');
-      await _audioPlayer.setVolume(0).catchError((e) {
-        print('🛑 MQTT [$isolateName]: Volume error: $e');
-      });
-      
-      print('🛑 MQTT [$isolateName]: Executing release...');
       await _audioPlayer.release().catchError((e) {
-        print('🛑 MQTT [$isolateName]: Release error: $e');
       });
       
-      print('🛑 MQTT [$isolateName]: Audio hardware commands completed');
     } catch (e) {
-      print('🛑 MQTT [$isolateName]: Stop error: $e');
+      print('Stop error: $e');
     }
     
-    // Clear mute window after 3 seconds to allow next call but block race conditions
     Future.delayed(const Duration(seconds: 3), () {
       _isMutedWindow = false;
-      print('🛑 MQTT [$isolateName]: Mute window cleared');
     });
 
     if (broadcast) {
-      print('MQTT [$isolateName]: Broadcasting stop_audio signal globally');
-      
       // Signal all Isolates via Port Registry (Fastest)
       // This reaches the Main Isolate and the Background Isolate if they are listening
       for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
