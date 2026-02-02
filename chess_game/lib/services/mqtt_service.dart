@@ -184,22 +184,20 @@ class MqttService {
   }
 
   void onNotificationTapped(NotificationResponse response) async {
-    print('🔔 [FG] --- NOTIFICATION ACTION TRIGGERED ---');
-    print('🔔 [FG] ID: ${response.id}');
-    print('🔔 [FG] Action ID: "${response.actionId}"');
-    print('🔔 [FG] Raw Payload: ${response.payload}');
+    print('🚨🚨🚨 [FG-FATAL] NOTIFICATION ACTION TRIGGERED! Action="${response.actionId}"');
+    print('🚨🚨🚨 [FG-FATAL] Raw Payload: ${response.payload}');
     
     if (response.payload != null) {
       try {
         final Map<String, dynamic> data = json.decode(response.payload!);
         final payloadMap = (data['data'] ?? data['payload']) as Map<String, dynamic>?;
         final type = data['type'];
-        print('📦 [FG] Decoded: type=$type, actionId=${response.actionId}');
+        print('🚨🚨🚨 [FG-FATAL] type=$type, actionId=${response.actionId}');
 
         // Handle Game Invitation Actions
         if (type == 'game_invitation' || type == 'game_challenge') {
-          if (response.actionId == 'decline') {
-            print('❌ [FG] ACTION: DECLINE GAME');
+          if (response.actionId == 'decline_action' || response.actionId == 'decline') {
+            print('❌ [FG-FATAL] ACTION: DECLINE GAME');
             final rawId = payloadMap?['id'];
             final invitationId = int.tryParse(rawId.toString());
             if (invitationId != null) {
@@ -224,19 +222,19 @@ class MqttService {
         
         // Handle Call Invitation Actions
         if (type == 'call_invitation' || type == 'incoming_call') {
-          if (response.actionId == 'decline') {
-            print('❌ [FG] ACTION: DECLINE CALL');
+          if (response.actionId == 'decline_action' || response.actionId == 'decline') {
+            print('❌ [FG-FATAL] ACTION: DECLINE CALL');
             if (payloadMap != null) {
               final caller = payloadMap['caller'] ?? payloadMap['sender'];
               final roomId = payloadMap['room_id']?.toString();
               
               if (caller != null && roomId != null) {
-                  print('📡 [FG] Sending Decline Signal to: $caller');
+                  print('📡 [FG-FATAL] Sending Decline Signal to: $caller');
                   await GameService.declineCall(
                     callerUsername: caller,
                     roomId: roomId,
                   );
-                  print('✅ [FG] Decline SUCCESS');
+                  print('✅ [FG-FATAL] Decline SUCCESS');
               }
             }
             await cancelCallNotification();
@@ -436,16 +434,16 @@ class MqttService {
       ),
       actions: <AndroidNotificationAction>[
         const AndroidNotificationAction(
-          'decline',
+          'decline_action',
           'Decline',
-          showsUserInterface: false,
-          cancelNotification: false, // Manual cancel at end of handler
+          showsUserInterface: true, // Force foreground for reliability
+          cancelNotification: true, 
         ),
         const AndroidNotificationAction(
           'accept',
           'Accept',
           showsUserInterface: true,
-          cancelNotification: false, // Auto cancel is ok for foreground
+          cancelNotification: true, 
         ),
       ],
     );
@@ -487,16 +485,16 @@ class MqttService {
       ),
       actions: <AndroidNotificationAction>[
         const AndroidNotificationAction(
-          'decline',
+          'decline_action',
           'Decline',
-          showsUserInterface: false,
-          cancelNotification: false, // Manual cancel at end of BG handler
+          showsUserInterface: true, // Force foreground for reliability
+          cancelNotification: true, 
         ),
         const AndroidNotificationAction(
-          'accept',
+          'accept_action',
           'Accept',
           showsUserInterface: true,
-          cancelNotification: false, // Handle in FG/Manual cancel
+          cancelNotification: true, 
         ),
       ],
     );

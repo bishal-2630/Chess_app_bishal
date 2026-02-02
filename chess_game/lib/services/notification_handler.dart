@@ -40,7 +40,7 @@ void notificationTapBackground(NotificationResponse response) async {
         sendPort.send({'action': 'dismiss_call'});
 
         // If Decline, delegate the network request
-        if (actionId == 'decline') {
+        if (actionId == 'decline_action' || actionId == 'decline') {
           if ((type == 'call_invitation' || type == 'incoming_call') && payload != null) {
             final caller = payload['caller'] ?? payload['sender'];
             print('❌ [BG-FATAL] Signaling DECLINE for Call: $caller');
