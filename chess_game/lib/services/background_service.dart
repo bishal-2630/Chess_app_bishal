@@ -91,6 +91,9 @@ class BackgroundServiceInstance {
       final id = event?['id'] as int?;
       if (id != null) {
         final fln = FlutterLocalNotificationsPlugin();
+        await fln.initialize(const InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        ));
         await fln.cancel(id);
       }
     });

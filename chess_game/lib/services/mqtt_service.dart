@@ -19,51 +19,56 @@ void notificationTapBackground(NotificationResponse response) async {
   ));
 
   try {
+      // 0. INITIALIZE AUTH (Crucial for GameService calls in background isolate)
+      final authService = DjangoAuthService();
+      await authService.initialize();
+
       final rawPayload = response.payload;
       final rawData = rawPayload != null ? json.decode(rawPayload) : null;
+      
+      // Extract type and payload correctly (check both 'data' and 'payload' keys)
       final type = rawData != null ? rawData['type'] : null;
-      final payload = rawData != null ? rawData['payload'] : null;
+      final payload = rawData != null ? (rawData['data'] ?? rawData['payload']) : null;
       
       // Robust String extraction
       final String? roomId = (payload != null && payload['room_id'] != null) 
           ? payload['room_id'].toString() 
           : MqttService._currentCallRoomId;
       
-      // 0. IMMEDIATE CANCELLATION (Fix for stuck notifications)
+      // 1. IMMEDIATE CANCELLATION (Fix for stuck notifications)
       if (response.id != null) {
         await fln.cancel(response.id!);
-      } else {
-         await fln.cancel(999);
-         await fln.cancel(888);
       }
+      await fln.cancel(999);
+      await fln.cancel(888);
       
-      // 1. STOP AUDIO & UPDATE STATE
+      // 2. STOP AUDIO & UPDATE STATE
       final mqtt = MqttService();
       await mqtt.stopAudio(broadcast: false, roomId: roomId);
       
-      // 2. DISMISS DIALOGS (Main Isolate)
+      // 3. DISMISS DIALOGS (Main Isolate)
       FlutterBackgroundService().invoke('dismissCall');
 
-      // 3. BROADCAST VIA PORTS (Fallback)
+      // 4. BROADCAST VIA PORTS (Fallback)
       for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
         final sendPort = IsolateNameServer.lookupPortByName(portName);
         sendPort?.send({'action': 'stop_audio', 'roomId': roomId});
       }
 
       if (response.actionId == 'decline') {
-        if (type == 'call_invitation' && payload != null) {
+        if ((type == 'call_invitation' || type == 'incoming_call') && payload != null) {
           final caller = payload['caller'];
           if (caller != null && roomId != null) {
             await GameService.declineCall(callerUsername: caller, roomId: roomId);
           }
-        } else if (type == 'game_invitation' && payload != null) {
+        } else if ((type == 'game_invitation' || type == 'game_challenge') && payload != null) {
           final invitationId = payload['id'];
           if (invitationId != null) {
             await GameService.respondToInvitation(invitationId: invitationId, action: 'decline');
           }
         }
       } else if (response.actionId == 'accept') {
-        // App will handle navigation.
+        // App will handle navigation via Main Isolate
       }
 
     } catch (e) {
@@ -198,24 +203,23 @@ class MqttService {
   void onNotificationTapped(NotificationResponse response) async {
     if (response.payload != null) {
       try {
-        final data = json.decode(response.payload!);
-        final payloadType = data['type'];
+        final Map<String, dynamic> data = json.decode(response.payload!);
+        final payloadMap = (data['data'] ?? data['payload']) as Map<String, dynamic>?;
+        final type = data['type'];
 
         // Handle Game Invitation Actions
-        if (payloadType == 'game_invitation') {
+        if (type == 'game_invitation' || type == 'game_challenge') {
           if (response.actionId == 'decline') {
-            print('❌ User declined game from notification');
-            final invitationId = data['payload']['id'];
+            final invitationId = payloadMap?['id'];
             if (invitationId != null) {
               await GameService.respondToInvitation(
                 invitationId: invitationId,
                 action: 'decline',
               );
-              print('✅ Decline signal sent for game invite');
             }
+            await cancelCallNotification();
             return;
           } else if (response.actionId == 'accept') {
-            print('✅ User accepted game from notification');
             _emitNotification({
               ...data,
               'action': 'accept',
@@ -225,46 +229,38 @@ class MqttService {
         }
         
         // Handle Call Invitation Actions
-        if (response.actionId == 'decline') {
-          print('❌ User declined call from notification');
-          
-          try {
-            final payloadMap = data['payload'] as Map<String, dynamic>;
-            final caller = payloadMap['caller'];
-            final roomId = payloadMap['room_id'];
-            
-            if (caller != null && roomId != null) {
-               await GameService.declineCall(
-                  callerUsername: caller,
-                  roomId: roomId,
-                );
-                print('✅ Decline signal sent from notification');
+        if (type == 'call_invitation' || type == 'incoming_call') {
+          if (response.actionId == 'decline') {
+            if (payloadMap != null) {
+              final caller = payloadMap['caller'];
+              final roomId = payloadMap['room_id']?.toString();
+              
+              if (caller != null && roomId != null) {
+                  await GameService.declineCall(
+                    callerUsername: caller,
+                    roomId: roomId,
+                  );
+              }
             }
-          } catch (e) {
-            print('⚠️ Error parsing payload for decline: $e');
+            await cancelCallNotification();
+            return;
+          } else if (response.actionId == 'accept') {
+            _isInCall = true; // Mark as in-call to prevent further ringing
+            
+            // Cleanup in background without awaiting
+            stopAudio();
+            cancelCallNotification();
+            
+            // Broadcast to open call screen immediately
+            _emitNotification({
+              ...data,
+              'action': 'accept',
+            });
+            return;
           }
-          
-          await cancelCallNotification();
-          return;
-        } else if (response.actionId == 'accept') {
-          print('✅ User accepted call from notification');
-          
-          
-          _isInCall = true; // Mark as in-call to prevent further ringing
-          
-          // Cleanup in background without awaiting
-          stopAudio();
-          cancelCallNotification();
-          
-          // Broadcast to open call screen immediately
-          _emitNotification({
-            ...data,
-            'action': 'accept',
-          });
-          return;
         }
         
-        // Handle regular notification tap (no action body)
+        // Handle regular notification tap (no action button pressed)
         _emitNotification(data);
       } catch (e) {
         print('Error parsing notification payload: $e');
