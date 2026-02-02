@@ -64,16 +64,17 @@ class MqttService {
     );
     
     if (isMainIsolate) {
-      print('MQTT: Registering notification callbacks in Main Isolate');
+      print('MQTT: Registering full notification callbacks (Main Isolate)');
       await flutterLocalNotificationsPlugin.initialize(
         initializationSettings,
         onDidReceiveNotificationResponse: onNotificationTapped,
         onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
       );
     } else {
-      print('MQTT: Skipping notification callback registration in non-main isolate');
+      print('MQTT: Registering background-safe callbacks (Non-Main Isolate)');
       await flutterLocalNotificationsPlugin.initialize(
         initializationSettings,
+        onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
       );
     }
 
