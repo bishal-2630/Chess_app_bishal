@@ -44,6 +44,20 @@ void onStart(ServiceInstance service) async {
         MqttService().ignoreRoom(roomId);
       }
       MqttService().stopAudio(broadcast: false, roomId: roomId);
+    } else if (type == 'decline_call') {
+       final caller = data['caller'];
+       final roomId = data['roomId'];
+       if (caller != null && roomId != null) {
+         print('Background Isolate: Sending decline signal for $caller');
+         await GameService.declineCall(callerUsername: caller, roomId: roomId);
+       }
+    } else if (type == 'respond_invitation') {
+       final id = data['invitationId'];
+       final action = data['action'];
+       if (id != null && action != null) {
+         print('Background Isolate: Responding $action to invitation $id');
+         await GameService.respondToInvitation(invitationId: id, action: action);
+       }
     } else if (type == 'cancel_notification') {
        final id = payload?['id'];
        if (id != null) {

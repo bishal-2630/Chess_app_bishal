@@ -143,6 +143,18 @@ class MqttService {
         } else if (message['action'] == 'dismiss_call') {
           // Internal signal to clear UI or stop ringing
           _notificationController.add({'type': 'dismiss_call'});
+        } else if (message['action'] == 'decline_call') {
+          _notificationController.add({
+            'type': 'decline_call', 
+            'caller': message['caller'],
+            'roomId': message['roomId'],
+          });
+        } else if (message['action'] == 'respond_invitation') {
+          _notificationController.add({
+            'type': 'respond_invitation',
+            'invitationId': message['invitationId'],
+            'action': message['action_type'],
+          });
         } else if (message['action'] == 'cancel_notification') {
           final id = message['id'];
           if (id != null) {
