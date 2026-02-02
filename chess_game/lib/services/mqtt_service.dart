@@ -13,6 +13,8 @@ import 'notification_handler.dart';
 // No handler here anymore, moved to notification_handler.dart
 
 class MqttService {
+  static bool isMainIsolate = false; // Set this in main.dart
+  
   // Static port to prevent GC
   static final ReceivePort _listenerPort = ReceivePort();
 
@@ -41,7 +43,8 @@ class MqttService {
     _notificationController.add(data);
   }
 
-  static final AudioPlayer _audioPlayer = AudioPlayer();
+  static AudioPlayer? __audioPlayer;
+  static AudioPlayer get _audioPlayer => __audioPlayer ??= AudioPlayer();
   static bool _isAudioLoading = false;
   static bool _isPlaying = false;
   static bool _isMutedWindow = false; // Prevents re-ring within a short window
@@ -91,38 +94,38 @@ class MqttService {
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
             
-    // Set Audio Context for better control on physical devices
-    try {
-      // Simplified context for maximum compatibility
-      const audioContext = AudioContext(
-        iOS: AudioContextIOS(
-          category: AVAudioSessionCategory.playback,
-        ),
-        android: AudioContextAndroid(
-          usageType: AndroidUsageType.notificationRingtone,
-          contentType: AndroidContentType.music,
-          audioFocus: AndroidAudioFocus.gainTransientMayDuck,
-        ),
-      );
-      AudioLogger.logLevel = AudioLogLevel.none;
-      await AudioPlayer.global.setAudioContext(audioContext).catchError((_) {});
-    } catch (e) {
-      print('⚠️ MQTT: Global audio context error: $e');
+    // Set Audio Context for better control on physical devices (Main Isolate Only)
+    if (isMainIsolate) {
+      try {
+        const audioContext = AudioContext(
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.playback,
+          ),
+          android: AudioContextAndroid(
+            usageType: AndroidUsageType.notificationRingtone,
+            contentType: AndroidContentType.music,
+            audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+          ),
+        );
+        AudioLogger.logLevel = AudioLogLevel.none;
+        await AudioPlayer.global.setAudioContext(audioContext).catchError((_) {});
+      } catch (e) {
+        print('⚠️ MQTT: Global audio context error: $e');
+      }
     }
 
     await androidPlugin?.createNotificationChannel(challengeChannel);
     await androidPlugin?.createNotificationChannel(callChannel);
 
     // Request notification permissions ONLY in Main Isolate (requires Activity)
-    final isBackground = IsolateNameServer.lookupPortByName('chess_game_bg_port') != null;
-    if (!isBackground) {
+    if (isMainIsolate) {
       print('MQTT: Main Isolate detected, requesting permissions...');
       final bool? permissionGranted = await androidPlugin?.requestNotificationsPermission();
       if (permissionGranted == false) {
         print('MQTT: Notification permission denied');
       }
     } else {
-      print('MQTT: Background Isolate detected, skipping permission request');
+      print('MQTT: Isolate skipping permission request (isMainIsolate=false)');
     }
   }
   

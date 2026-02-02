@@ -13,7 +13,8 @@ Future<bool> onIosBackground(ServiceInstance service) async {
 
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
-  DartPluginRegistrant.ensureInitialized();
+  // Removed manual DartPluginRegistrant.ensureInitialized() as it triggers problematic UI plugin loads in BG
+  print('🚀 [BG-SERVICE] Isolate Starting...');
 
   // Check if user is logged in before connecting
   final authService = DjangoAuthService();
@@ -129,7 +130,7 @@ class BackgroundServiceInstance {
       ),
       iosConfiguration: IosConfiguration(
         autoStart: true,
-        onForeground: onStart,
+        onForeground: (ServiceInstance service) {}, // Do nothing in FG isolate
         onBackground: onIosBackground,
       ),
     );
