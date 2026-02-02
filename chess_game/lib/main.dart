@@ -144,7 +144,7 @@ class IncomingCallWrapper extends StatefulWidget {
 }
 
 class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
-  bool _isDialogShowing = false;
+  // Removed _isDialogShowing as dialogs are now disabled per user request
 
   @override
   void initState() {
@@ -174,10 +174,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
   }
 
   void _dismissCurrentDialog() {
-    if (_isDialogShowing && mounted) {
-      Navigator.of(context, rootNavigator: true).pop();
-      _isDialogShowing = false;
-    }
+    // Dialogs are disabled, but keeping this for potential manual dismiss signals from service
   }
 
   Future<void> _handleInitialNotification() async {
@@ -229,24 +226,12 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
     final action = data['action'];
     final payload = data['data'] ?? data['payload'];
 
-
     if (type == 'call_ended' || type == 'call_declined' || type == 'call_cancelled') {
       // Stop audio immediately as this is a termination event
       final roomId = payload['room_id'];
       MqttService().stopAudio(broadcast: true, roomId: roomId);
-      
-      if (_isDialogShowing) {
-        Navigator.of(context, rootNavigator: true).pop();
-        _isDialogShowing = false;
-      }
     } else if (type == 'call_invitation') {
       if (action == 'accept') {
-        
-        if (_isDialogShowing) {
-           Navigator.of(context).pop();
-           _isDialogShowing = false;
-        }
-
         // Cleanup in background without awaiting
         MqttService().stopAudio(broadcast: true);
         MqttService().cancelCallNotification();
@@ -258,15 +243,11 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
         } catch (e) {
         }
       } else {
-        _showIncomingCallDialog(payload);
+        // PER USER REQUEST: Do not show dialog box anymore.
+        // User must respond from the system notification.
       }
     } else if (type == 'game_invitation') {
       if (action == 'accept') {
-        if (_isDialogShowing) {
-          Navigator.of(context).pop();
-          _isDialogShowing = false;
-        }
-
         final roomId = payload['room_id'];
         
         // Navigate immediately
@@ -284,7 +265,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
           );
         }
       } else {
-        _showGameInvitationDialog(payload);
+        // PER USER REQUEST: Do not show dialog box anymore.
       }
     } else if (type == 'invitation_response') {
       _handleInvitationResponse(payload);
@@ -318,139 +299,6 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
     } catch (e) {
       print('Error declining invitation: $e');
     }
-  }
-
-  void _showIncomingCallDialog(Map<String, dynamic> callData) {
-    if (!mounted) return;
-    
-    final roomId = callData['room_id'];
-    final caller = callData['caller'];
-
-    if (_isDialogShowing) {
-      return;
-    }
-    
-    _isDialogShowing = true; // Set to true when showing
-
-    showDialog(
-      context:
-          context, // This context works because it's inside MaterialApp builder?
-      // Actually, this context is ABOVE the Navigator if wrapping child.
-      // We need a context that has a Material ancestor?
-      // MaterialApp -> builder -> IncomingCallWrapper -> child(Navigator).
-      // So IncomingCallWrapper is inside MaterialApp. It should work.
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Incoming Call'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircleAvatar(
-              child: Text(caller[0].toUpperCase()),
-            ),
-            const SizedBox(height: 16),
-            Text('$caller is calling you...'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              // IMMEDIATE: Cancel notification & Stop audio
-              MqttService().cancelCallNotification(roomId: roomId);
-              await MqttService().stopAudio(broadcast: true, roomId: roomId);
-              
-              _isDialogShowing = false;
-              Navigator.of(dialogContext).pop();
-              
-              // Send decline signal to caller
-              await GameService.declineCall(
-                callerUsername: caller,
-                roomId: roomId,
-              );
-            },
-            child: const Text('Decline', style: TextStyle(color: Colors.red)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // IMMEDIATE: Cancel notification
-              MqttService().cancelCallNotification(roomId: roomId);
-              
-              _isDialogShowing = false;
-              Navigator.of(dialogContext).pop();
-
-              // Navigate immediately
-              context.go('/call?roomId=$roomId&otherUserName=$caller&isCaller=false');
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text('Accept'),
-          ),
-        ],
-      ),
-    ).then((_) => _isDialogShowing = false);
-  }
-
-  void _showGameInvitationDialog(Map<String, dynamic> invData) {
-    if (!mounted) return;
-
-    final sender = invData['sender']['username'] ?? invData['sender'];
-    final roomId = invData['room_id'];
-    final invitationId = invData['id'];
-
-    Timer? expiryTimer;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        // Auto-dismiss after 1 minute
-        expiryTimer = Timer(const Duration(minutes: 1), () {
-          if (mounted) {
-            Navigator.of(dialogContext).pop();
-            _declineInvitation(invitationId);
-          }
-        });
-
-        return AlertDialog(
-          title: const Text('Game Challenge'),
-          content: Text(
-              '$sender has challenged you to a game!\n\nThis invitation expires in 60 seconds.'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                // IMMEDIATE: Cancel notification
-                MqttService().cancelCallNotification();
-                
-                expiryTimer?.cancel();
-                Navigator.of(dialogContext).pop();
-                
-                _declineInvitation(invitationId);
-              },
-              child: const Text('Decline', style: TextStyle(color: Colors.red)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                // IMMEDIATE: Cancel notification
-                MqttService().cancelCallNotification();
-                
-                expiryTimer?.cancel();
-                Navigator.of(dialogContext).pop();
-                
-                GameService.respondToInvitation(
-                  invitationId: invitationId,
-                  action: 'accept',
-                ).then((result) {
-                  if (result['success'] && mounted) {
-                    context.go('/chess?roomId=$roomId&color=b');
-                  }
-                });
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              child: const Text('Accept'),
-            ),
-          ],
-        );
-      },
-    ).then((_) => expiryTimer?.cancel());
   }
 
   @override

@@ -87,6 +87,14 @@ class BackgroundServiceInstance {
       service.stopSelf();
     });
 
+    service.on('cancelNotification').listen((event) async {
+      final id = event?['id'] as int?;
+      if (id != null) {
+        final fln = FlutterLocalNotificationsPlugin();
+        await fln.cancel(id);
+      }
+    });
+
     // Keep service alive
     Timer.periodic(const Duration(seconds: 10), (timer) async {
       if (service is AndroidServiceInstance) {

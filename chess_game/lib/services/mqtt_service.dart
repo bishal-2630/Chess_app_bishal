@@ -563,6 +563,11 @@ class MqttService {
     await flutterLocalNotificationsPlugin.cancel(888);
     await flutterLocalNotificationsPlugin.cancel(999);
     
+    // Broadcast cancellation to other isolates (especially Background Service)
+    FlutterBackgroundService().invoke('cancelNotification', {'id': 1000}); // Clear all just in case
+    FlutterBackgroundService().invoke('cancelNotification', {'id': 999});
+    FlutterBackgroundService().invoke('cancelNotification', {'id': 888});
+    
     // Prioritize the passed roomId, then the current one
     final String? roomIdToStop = roomId ?? _currentCallRoomId;
     
