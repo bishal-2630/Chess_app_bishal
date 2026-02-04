@@ -106,7 +106,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
     // Listen for incoming calls during gameplay
     _callNotificationSubscription = MqttService().notifications.listen((data) {
       if (!mounted) return;
-      
+
       final type = data['type'];
       print('♟️ ChessScreen MQTT: Received type=$type'); // DEBUG LOG
 
@@ -114,26 +114,29 @@ class _ChessGameScreenState extends State<ChessScreen> {
         final payload = data['data'] ?? data['payload'];
         final caller = payload['caller'] ?? payload['sender'];
         final roomId = payload['room_id'];
-        
-        print('♟️ ChessScreen MQTT: Call Inv - RoomId: $roomId, MyRoom: ${widget.roomId}, Connected: $_isConnectedToRoom'); // DEBUG LOG
-        
+
+        print(
+            '♟️ ChessScreen MQTT: Call Inv - RoomId: $roomId, MyRoom: ${widget.roomId}, Connected: $_isConnectedToRoom'); // DEBUG LOG
+
         // If user is in a chess room, show banner and cancel system notification
         if (_isConnectedToRoom) {
           // Cancel system notification in favor of in-app banner
           // Use dismissCallNotification to avoid stopping audio or ignoring room
           MqttService().dismissCallNotification();
-          
+
           setState(() {
             _showIncomingCallBanner = true;
             _incomingCallFrom = caller ?? 'Unknown';
             _incomingCallRoomId = roomId ?? '';
           });
-          
+
           // Ringtone is already playing from MqttService
         }
         // If user is not in a room, system notification will handle it
         // (MqttService already shows notification and plays ringtone)
-      } else if (type == 'call_ended' || type == 'call_declined' || type == 'call_cancelled') {
+      } else if (type == 'call_ended' ||
+          type == 'call_declined' ||
+          type == 'call_cancelled') {
         // Hide banner and stop ringtone
         setState(() {
           _showIncomingCallBanner = false;
@@ -195,7 +198,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
 
     _signalingService.onPlayerLeft = () {
       print("Opponent left");
-      
+
       // If game was active, record as a win for this player
       if (!gameOver && moveHistory.isNotEmpty) {
         GameService.recordGameResult('win');
@@ -342,7 +345,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
 
   void _toggleMute() {
     setState(() {
-    _isMuted = !_isMuted;
+      _isMuted = !_isMuted;
     });
     _signalingService.muteAudio(_isMuted);
   }
@@ -366,8 +369,9 @@ class _ChessGameScreenState extends State<ChessScreen> {
                   ),
                   TextButton(
                     onPressed: () => Navigator.pop(context, true),
-                    child: const Text('LEAVE GAME', 
-                      style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                    child: const Text('LEAVE GAME',
+                        style: TextStyle(
+                            color: Colors.red, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -475,7 +479,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
           _setEphemeralStatus("Calling...");
           // Play calling ringtone IMMEDIATELY before signaling setup
           MqttService().playSound('sounds/call_ringtone.mp3');
-          
+
           await _signalingService.startCall(_localRenderer, _remoteRenderer);
         }
       } catch (e) {
@@ -1803,7 +1807,8 @@ class _ChessGameScreenState extends State<ChessScreen> {
   void _showGameOverDialog(String message) {
     // Record game statistics if in an online game
     if (_isConnectedToRoom && _playerColor != null) {
-      if (message.toLowerCase().contains('draw') || message.toLowerCase().contains('stalemate')) {
+      if (message.toLowerCase().contains('draw') ||
+          message.toLowerCase().contains('stalemate')) {
         GameService.recordGameResult('draw');
       } else if (winner != null) {
         final String myColorName = _playerColor == 'w' ? 'White' : 'Black';
@@ -1932,298 +1937,317 @@ class _ChessGameScreenState extends State<ChessScreen> {
             children: [
               // User Profile Header
               // User Profile Header
-          // User Profile Header
-          GestureDetector(
-            onTap: () => context.go('/profile'),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              color: Colors.blue[50],
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: Colors.blue[100],
-                    backgroundImage:
-                        _authService.currentUser?['profile_picture'] != null
+              // User Profile Header
+              GestureDetector(
+                onTap: () => context.go('/profile'),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  color: Colors.blue[50],
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 24,
+                        backgroundColor: Colors.blue[100],
+                        backgroundImage: _authService
+                                    .currentUser?['profile_picture'] !=
+                                null
                             ? NetworkImage(
                                 _authService.currentUser!['profile_picture']!)
                             : null,
-                    child: _authService.currentUser?['profile_picture'] == null
-                        ? Icon(
-                            Icons.person,
-                            size: 24,
-                            color: Colors.blue[800],
-                          )
-                        : null,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _authService.displayName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          _authService.email ?? 'No email',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    Icons.chevron_right,
-                    color: Colors.grey[500],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Game Status with check indicator
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-            color: isWhiteTurn ? Colors.white : Colors.black,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  status,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isWhiteTurn ? Colors.black : Colors.white,
-                  ),
-                ),
-                if (whiteInCheck || blackInCheck)
-                  const Icon(
-                    Icons.warning,
-                    color: Colors.red,
-                    size: 20,
-                  ),
-                Text(
-                  'Moves: ${moveHistory.length}',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isWhiteTurn ? Colors.black54 : Colors.white70,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Top captured pieces (Opponent's captures)
-          _buildCapturedDisplay(_playerColor == 'b' ? blackCapturedPieces : whiteCapturedPieces),
-
-          // Chess Board
-          Expanded(
-            child: Center(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  // Use the smaller dimension to keep board square and on screen
-                  final size =
-                      min(constraints.maxWidth, constraints.maxHeight) * 0.9;
-                  return Container(
-                    width: size,
-                    height: size,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.brown, width: 4),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 10,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: GridView.builder(
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 8,
+                        child:
+                            _authService.currentUser?['profile_picture'] == null
+                                ? Icon(
+                                    Icons.person,
+                                    size: 24,
+                                    color: Colors.blue[800],
+                                  )
+                                : null,
                       ),
-                      itemCount: 64,
-                      itemBuilder: (context, index) {
-                        // Flip board for black player
-                        final row =
-                            _playerColor == 'b' ? 7 - (index ~/ 8) : index ~/ 8;
-                        final col =
-                            _playerColor == 'b' ? 7 - (index % 8) : index % 8;
-                        return _buildChessSquare(row, col);
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-
-          // Bottom captured pieces (Current player's captures)
-          _buildCapturedDisplay(_playerColor == 'b' ? whiteCapturedPieces : blackCapturedPieces),
-
-          // Call Status Footer (Only show when message is active)
-          if (_callStatus.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.all(8),
-              width: double.infinity,
-              color: Colors.green[100],
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.info_outline, size: 16, color: Colors.green[800]),
-                  const SizedBox(width: 8),
-                  Text(
-                    _callStatus,
-                    style: TextStyle(
-                        color: Colors.green[800], fontWeight: FontWeight.w500),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _authService.displayName,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              _authService.email ?? 'No email',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right,
+                        color: Colors.grey[500],
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
 
-          // Controls
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              // Game Status with check indicator
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                color: isWhiteTurn ? Colors.white : Colors.black,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed:
-                            _isConnectedToRoom || pendingPromotion != null
-                                ? null
-                                : _undoMove,
-                        icon: const Icon(Icons.undo),
-                        label: const Text('Undo'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              (_isConnectedToRoom || pendingPromotion != null)
+                    Text(
+                      status,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: isWhiteTurn ? Colors.black : Colors.white,
+                      ),
+                    ),
+                    if (whiteInCheck || blackInCheck)
+                      const Icon(
+                        Icons.warning,
+                        color: Colors.red,
+                        size: 20,
+                      ),
+                    Text(
+                      'Moves: ${moveHistory.length}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isWhiteTurn ? Colors.black54 : Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Top captured pieces (Opponent's captures)
+              _buildCapturedDisplay(_playerColor == 'b'
+                  ? blackCapturedPieces
+                  : whiteCapturedPieces),
+
+              // Chess Board
+              Expanded(
+                child: Center(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Use the smaller dimension to keep board square and on screen
+                      final size =
+                          min(constraints.maxWidth, constraints.maxHeight) *
+                              0.9;
+                      return Container(
+                        width: size,
+                        height: size,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.brown, width: 4),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 10,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: GridView.builder(
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 8,
+                          ),
+                          itemCount: 64,
+                          itemBuilder: (context, index) {
+                            // Flip board for black player
+                            final row = _playerColor == 'b'
+                                ? 7 - (index ~/ 8)
+                                : index ~/ 8;
+                            final col = _playerColor == 'b'
+                                ? 7 - (index % 8)
+                                : index % 8;
+                            return _buildChessSquare(row, col);
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+
+              // Bottom captured pieces (Current player's captures)
+              _buildCapturedDisplay(_playerColor == 'b'
+                  ? whiteCapturedPieces
+                  : blackCapturedPieces),
+
+              // Call Status Footer (Only show when message is active)
+              if (_callStatus.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  width: double.infinity,
+                  color: Colors.green[100],
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.info_outline,
+                          size: 16, color: Colors.green[800]),
+                      const SizedBox(width: 8),
+                      Text(
+                        _callStatus,
+                        style: TextStyle(
+                            color: Colors.green[800],
+                            fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Controls
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed:
+                                _isConnectedToRoom || pendingPromotion != null
+                                    ? null
+                                    : _undoMove,
+                            icon: const Icon(Icons.undo),
+                            label: const Text('Undo'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: (_isConnectedToRoom ||
+                                      pendingPromotion != null)
                                   ? Colors.grey
                                   : Colors.orange,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          if (_isConnectedToRoom) {
-                            _signalingService.sendNewGame();
-                          }
-                          _initializeBoard();
-                        },
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('New'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => context.go('/users'),
-                        icon: const Icon(Icons.people),
-                        label: const Text('Players'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.purple,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () async {
-                                await context.push('/invitations');
-                                _loadInviteCount(); // Refresh when coming back
-                              },
-                              icon: const Icon(Icons.mail),
-                              label: const Text('Invites'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.teal,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
-                          if (_inviteCount > 0)
-                            Positioned(
-                              right: -5,
-                              top: -5,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: Colors.red,
-                                  shape: BoxShape.circle,
-                                ),
-                                constraints: const BoxConstraints(
-                                  minWidth: 20,
-                                  minHeight: 20,
-                                ),
-                                child: Text(
-                                  '$_inviteCount',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              if (_isConnectedToRoom) {
+                                _signalingService.sendNewGame();
+                              }
+                              _initializeBoard();
+                            },
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('New'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => context.go('/users'),
+                            icon: const Icon(Icons.people),
+                            label: const Text('Players'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.purple,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: () async {
+                                    await context.push('/invitations');
+                                    _loadInviteCount(); // Refresh when coming back
+                                  },
+                                  icon: const Icon(Icons.mail),
+                                  label: const Text('Invites'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.teal,
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 12),
                                   ),
-                                  textAlign: TextAlign.center,
                                 ),
                               ),
-                            ),
-                        ],
-                      ),
+                              if (_inviteCount > 0)
+                                Positioned(
+                                  right: -5,
+                                  top: -5,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    constraints: const BoxConstraints(
+                                      minWidth: 20,
+                                      minHeight: 20,
+                                    ),
+                                    child: Text(
+                                      '$_inviteCount',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),,
-            
-            // In-game call notification banner
-            if (_showIncomingCallBanner)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: SafeArea(
-                  child: CallNotificationBanner(
-                    callerName: _incomingCallFrom,
-                    onAnswer: () async {
-                      await MqttService().stopAudio();
-                      setState(() => _showIncomingCallBanner = false);
-                      if (mounted) {
-                        context.push('/call?roomId=$_incomingCallRoomId&otherUserName=$_incomingCallFrom&isCaller=false');
-                      }
-                    },
-                    onDecline: () async {
-                      await MqttService().stopAudio();
-                      setState(() => _showIncomingCallBanner = false);
-                      await GameService.declineCall(callerUsername: _incomingCallFrom, roomId: _incomingCallRoomId);
-                    },
-                  ),
+              ),
+            ],
+          ),
+
+          // In-game call notification banner
+          if (_showIncomingCallBanner)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                child: CallNotificationBanner(
+                  callerName: _incomingCallFrom,
+                  onAnswer: () async {
+                    await MqttService().stopAudio();
+                    setState(() => _showIncomingCallBanner = false);
+                    if (mounted) {
+                      context.push(
+                          '/call?roomId=$_incomingCallRoomId&otherUserName=$_incomingCallFrom&isCaller=false');
+                    }
+                  },
+                  onDecline: () async {
+                    await MqttService().stopAudio();
+                    setState(() => _showIncomingCallBanner = false);
+                    await GameService.declineCall(
+                        callerUsername: _incomingCallFrom,
+                        roomId: _incomingCallRoomId);
+                  },
                 ),
               ),
+            ),
         ],
       ),
     );
