@@ -39,8 +39,9 @@ class _UserListScreenState extends State<UserListScreen> {
       if (!mounted) return;
 
       if (data['type'] == 'invitation_response') {
-        final action = data['action'];
-        final invitation = data['data'] ?? data['payload'];
+        final payload = data['data'] ?? data['payload'];
+        final action = payload['action'] ?? data['action'];
+        final invitation = payload['invitation'] ?? payload;
         final receiverName = invitation['receiver']['username'];
 
         if (action == 'decline') {

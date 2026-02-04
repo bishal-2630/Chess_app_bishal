@@ -256,6 +256,19 @@ class MqttService {
           }
         }
         
+        // Handle Invitation Response Actions (e.g. Join Challenge)
+        if (type == 'invitation_response') {
+          final action = payloadMap?['action'] ?? data['action'];
+          if (action == 'accept' || response.actionId == 'join_action') {
+            print('✅ [FG] ACTION: JOIN CHALLENGE');
+            _emitNotification({
+              ...data,
+              'action': 'accept',
+            });
+            return;
+          }
+        }
+
         // Handle regular notification tap (no action button pressed)
         print('👉 [FG] Manual Tap - Emitting notification data');
         _emitNotification(data);
@@ -411,13 +424,31 @@ class MqttService {
         }
     } else if (type == 'invitation_response') {
       final invitation = payload['invitation'];
-      final action = data['action'];
+      final action = payload['action'];
       
       if (action == 'decline') {
         _showLocalNotification(
           'Missed Challenge',
           '${invitation['receiver']['username']} declined your challenge.',
           'invitation_declined',
+        );
+      } else if (action == 'accept') {
+        final roomId = invitation['room_id'];
+        _showLocalNotification(
+          'Challenge Accepted',
+          '${invitation['receiver']['username']} is ready! Tap to join.',
+          json.encode({
+            'type': 'invitation_response',
+            'action': 'accept',
+            'payload': invitation, 
+          }),
+          actions: [
+            const AndroidNotificationAction(
+              'join_action',
+              'Join Now',
+              showsUserInterface: true,
+            ),
+          ],
         );
       }
     }
@@ -554,18 +585,19 @@ class MqttService {
     );
   }
 
-  Future<void> _showLocalNotification(String title, String body, String payload) async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+  Future<void> _showLocalNotification(String title, String body, String payload, {List<AndroidNotificationAction>? actions}) async {
+    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'chess_general_alerts',
       'General Alerts',
       channelDescription: 'General notifications and alerts',
-      importance: Importance.defaultImportance,
-      priority: Priority.defaultPriority,
+      importance: Importance.max,
+      priority: Priority.high,
       showWhen: true,
       autoCancel: true,
+      actions: actions,
     );
 
-    const NotificationDetails notificationDetails = NotificationDetails(android: androidDetails);
+    final NotificationDetails notificationDetails = NotificationDetails(android: androidDetails);
     final int notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
     await flutterLocalNotificationsPlugin.show(

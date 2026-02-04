@@ -261,8 +261,8 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
   void _handleInvitationResponse(Map<String, dynamic> data) {
     if (!mounted) return;
     
-    final action = data['action'];
     final payload = data['data'] ?? data['payload'];
+    final action = payload['action'] ?? data['action'];
     final invitation = payload['invitation'] ?? payload;
     final receiver = invitation['receiver']['username'];
     final roomId = invitation['room_id'];
