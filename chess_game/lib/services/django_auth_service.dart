@@ -60,6 +60,11 @@ class DjangoAuthService {
     }
   }
 
+  void updateCurrentUser(Map<String, dynamic> userData) {
+    _currentUser = userData;
+    _saveAuthData();
+  }
+
   Future<void> _saveAuthData() async {
     final prefs = await SharedPreferences.getInstance();
     if (_accessToken != null) await prefs.setString(_tokenKey, _accessToken!);

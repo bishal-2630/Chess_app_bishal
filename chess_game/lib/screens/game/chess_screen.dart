@@ -149,6 +149,12 @@ class _ChessGameScreenState extends State<ChessScreen> {
 
     _signalingService.onPlayerLeft = () {
       print("Opponent left");
+      
+      // If game was active, record as a win for this player
+      if (!gameOver && moveHistory.isNotEmpty) {
+        GameService.recordGameResult('win');
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text("Opponent left the room. Resetting game."),
         backgroundColor: Colors.redAccent,
@@ -290,13 +296,44 @@ class _ChessGameScreenState extends State<ChessScreen> {
 
   void _toggleMute() {
     setState(() {
-      _isMuted = !_isMuted;
+    _isMuted = !_isMuted;
     });
     _signalingService.muteAudio(_isMuted);
   }
 
-  void _onLogout() {
+  void _onLogout() async {
     if (_isConnectedToRoom) {
+      if (!gameOver && moveHistory.isNotEmpty) {
+        // Game is active, ask for confirmation
+        final bool confirm = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Leave Game?'),
+                content: const Text(
+                  'If you leave now, you will lose the game. Are you sure?',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('CANCEL'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('LEAVE GAME', 
+                      style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ) ??
+            false;
+
+        if (!confirm) return;
+
+        // Record loss if confirmed
+        await GameService.recordGameResult('loss');
+      }
+
       _signalingService.sendBye();
       _hangUp();
     }
@@ -1717,6 +1754,20 @@ class _ChessGameScreenState extends State<ChessScreen> {
   }
 
   void _showGameOverDialog(String message) {
+    // Record game statistics if in an online game
+    if (_isConnectedToRoom && _playerColor != null) {
+      if (message.toLowerCase().contains('draw') || message.toLowerCase().contains('stalemate')) {
+        GameService.recordGameResult('draw');
+      } else if (winner != null) {
+        final String myColorName = _playerColor == 'w' ? 'White' : 'Black';
+        if (winner == myColorName) {
+          GameService.recordGameResult('win');
+        } else {
+          GameService.recordGameResult('loss');
+        }
+      }
+    }
+
     showDialog(
       context: context,
       barrierDismissible: false,

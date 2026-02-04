@@ -343,4 +343,35 @@ class GameService {
       return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }
+
+  // Record game result (win, draw, loss)
+  static Future<Map<String, dynamic>> recordGameResult(String result) async {
+    try {
+      final response = await _authenticatedRequest(
+        'POST',
+        '${_baseUrl}game/result/',
+        body: json.encode({
+          'result': result,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        // Update local user data in DjangoAuthService if needed
+        final authService = DjangoAuthService();
+        if (authService.currentUser != null) {
+          final updatedUser = Map<String, dynamic>.from(authService.currentUser!);
+          updatedUser['wins'] = data['wins'];
+          updatedUser['draws'] = data['draws'];
+          updatedUser['losses'] = data['losses'];
+          authService.updateCurrentUser(updatedUser);
+        }
+        return {'success': true, 'data': data};
+      } else {
+        return {'success': false, 'error': 'Failed to record result'};
+      }
+    } catch (e) {
+      return {'success': false, 'error': 'Network error: ${e.toString()}'};
+    }
+  }
 }

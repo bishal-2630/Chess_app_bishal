@@ -144,11 +144,17 @@ class ProfileScreen extends StatelessWidget {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _buildStatItem('Games', '0', Icons.games),
-                          _buildStatItem('Wins', '0', Icons.emoji_events),
-                          _buildStatItem(
-                              'Losses', '0', Icons.sentiment_dissatisfied),
+                          _buildStatItem('Wins', (user?['wins'] ?? 0).toString(), Icons.emoji_events, color: Colors.green),
+                          _buildStatItem('Draws', (user?['draws'] ?? 0).toString(), Icons.handshake, color: Colors.orange),
+                          _buildStatItem('Losses', (user?['losses'] ?? 0).toString(), Icons.sentiment_dissatisfied, color: Colors.red),
                         ],
+                      ),
+                      const SizedBox(height: 15),
+                      Center(
+                        child: Text(
+                          'Total Games: ${(user?['wins'] ?? 0) + (user?['draws'] ?? 0) + (user?['losses'] ?? 0)}',
+                          style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ],
                   ),
@@ -211,10 +217,10 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon) {
+  Widget _buildStatItem(String label, String value, IconData icon, {Color? color}) {
     return Column(
       children: [
-        Icon(icon, color: Colors.blue[700], size: 30),
+        Icon(icon, color: color ?? Colors.blue[700], size: 30),
         const SizedBox(height: 5),
         Text(
           value,
