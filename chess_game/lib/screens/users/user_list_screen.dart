@@ -20,6 +20,7 @@ class _UserListScreenState extends State<UserListScreen> {
   String _searchQuery = '';
   final Map<String, DateTime> _sentChallenges = {};
   Timer? _challengeTimer;
+  StreamSubscription? _mqttSubscription;
 
   @override
   void initState() {
@@ -30,6 +31,27 @@ class _UserListScreenState extends State<UserListScreen> {
         setState(() {
           // Trigger rebuild to refresh "Sent" buttons
         });
+      }
+    });
+
+    // Listen for challenge responses to reset UI state
+    _mqttSubscription = MqttService().notifications.listen((data) {
+      if (!mounted) return;
+
+      if (data['type'] == 'invitation_response') {
+        final action = data['action'];
+        final invitation = data['data'] ?? data['payload'];
+        final receiverName = invitation['receiver']['username'];
+
+        if (action == 'decline') {
+          setState(() {
+            _sentChallenges.remove(receiverName);
+          });
+        } else if (action == 'accept') {
+          // Challenger auto-navigation
+          final roomId = invitation['room_id'];
+          context.go('/chess?roomId=$roomId&color=w');
+        }
       }
     });
   }
@@ -60,6 +82,7 @@ class _UserListScreenState extends State<UserListScreen> {
   @override
   void dispose() {
     _challengeTimer?.cancel();
+    _mqttSubscription?.cancel();
     // In case user leaves list screen while calling tone is playing
     MqttService().stopAudio();
     super.dispose();

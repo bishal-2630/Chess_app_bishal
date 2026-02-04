@@ -217,17 +217,7 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
       MqttService().stopAudio(broadcast: false, roomId: roomId);
       MqttService().cancelCallNotification(roomId: roomId, broadcast: false);
     } else if (type == 'invitation_response') {
-      final action = data['action'];
-      if (action == 'decline' && mounted) {
-        final invitation = payload['invitation'];
-        final receiverName = invitation['receiver']['username'];
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$receiverName declined your challenge'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
+      _handleInvitationResponse(data);
     } else if (type == 'call_invitation') {
       if (action == 'accept') {
         // Cleanup in background without awaiting
@@ -265,18 +255,19 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
       } else {
         // PER USER REQUEST: Do not show dialog box anymore.
       }
-    } else if (type == 'invitation_response') {
-      _handleInvitationResponse(payload);
     }
   }
 
   void _handleInvitationResponse(Map<String, dynamic> data) {
+    if (!mounted) return;
+    
     final action = data['action'];
-    final invitation = data['invitation'];
+    final payload = data['data'] ?? data['payload'];
+    final invitation = payload['invitation'] ?? payload;
     final receiver = invitation['receiver']['username'];
     final roomId = invitation['room_id'];
 
-    if (action == 'accept' && mounted) {
+    if (action == 'accept') {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('$receiver accepted your challenge! Joining game...'),
@@ -285,6 +276,13 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
       );
       // Navigate to the room as White (since we sent the challenge)
       context.go('/chess?roomId=$roomId&color=w');
+    } else if (action == 'decline') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$receiver declined your challenge'),
+          backgroundColor: Colors.orange,
+        ),
+      );
     }
   }
 

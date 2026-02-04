@@ -415,7 +415,7 @@ class MqttService {
       
       if (action == 'decline') {
         _showLocalNotification(
-          'Challenge Declined',
+          'Missed Challenge',
           '${invitation['receiver']['username']} declined your challenge.',
           'invitation_declined',
         );
