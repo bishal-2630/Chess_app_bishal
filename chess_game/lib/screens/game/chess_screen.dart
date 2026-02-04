@@ -10,6 +10,7 @@ import '../../services/game_service.dart';
 import 'dart:math';
 import 'dart:async';
 import 'package:permission_handler/permission_handler.dart';
+import '../../services/mqtt_service.dart';
 
 class ChessScreen extends StatefulWidget {
   final String? roomId;

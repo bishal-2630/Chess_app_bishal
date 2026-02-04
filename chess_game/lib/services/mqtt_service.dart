@@ -741,10 +741,6 @@ class MqttService {
     }
   }
 
-  Future<void> _handleAudioStop(String? roomId, {bool broadcast = false}) async {
-    // Renamed internal or usage? No, keeping stopAudio but cleaning up.
-  }
-  
   Future<void> stopAudio({bool broadcast = false, String? roomId}) async {
     _isPlaying = false; 
     _isMutedWindow = true; // Start mute window
