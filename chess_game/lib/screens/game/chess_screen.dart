@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'package:go_router/go_router.dart';
 import '../../services/signaling_service.dart';
 import '../../services/django_auth_service.dart';
@@ -92,6 +93,8 @@ class _ChessGameScreenState extends State<ChessScreen> {
   bool _isCalling = false; // New state for outgoing call
   String _incomingCallFrom = '';
   String _incomingCallRoomId = '';
+  int _callDuration = 0;
+  Timer? _callTimer;
   StreamSubscription? _callNotificationSubscription;
 
   @override
@@ -144,7 +147,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
           _showIncomingCallBanner = false;
           _isCalling = false; // Stop outgoing call banner too
         });
-        MqttService().stopAudio();
+        MqttService().stopAudio(broadcast: true);
       }
     });
 
@@ -246,7 +249,8 @@ class _ChessGameScreenState extends State<ChessScreen> {
       });
       // Banner handles "Voice Connected" UI
       // Stop calling ringtone
-      MqttService().stopAudio();
+      MqttService().stopAudio(broadcast: true);
+      _startCallTimer();
     };
 
     _signalingService.onCallRejected = () {
@@ -256,11 +260,13 @@ class _ChessGameScreenState extends State<ChessScreen> {
       });
       _setEphemeralStatus("Call Declined");
       // Stop calling ringtone
-      MqttService().stopAudio();
+      MqttService().stopAudio(broadcast: true);
+      _stopCallTimer();
     };
 
     _signalingService.onEndCall = () async {
-      await MqttService().stopAudio(); // Stop any ringing
+      await MqttService().stopAudio(broadcast: true); // Stop any ringing
+      _stopCallTimer();
       if (_isAudioOn || _callStatus == "Calling..." || _isCalling) {
         await _signalingService.stopAudio();
         setState(() {
@@ -394,6 +400,30 @@ class _ChessGameScreenState extends State<ChessScreen> {
     }
   }
 
+  void _startCallTimer() {
+    _callTimer?.cancel();
+    setState(() => _callDuration = 0);
+    _callTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() => _callDuration++);
+      }
+    });
+  }
+
+  void _stopCallTimer() {
+    _callTimer?.cancel();
+    _callTimer = null;
+    if (mounted) {
+      setState(() => _callDuration = 0);
+    }
+  }
+
+  String _formatDuration(int seconds) {
+    final minutes = (seconds / 60).floor();
+    final remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+
   @override
   void dispose() {
     print("🧹 Disposing ChessScreen state");
@@ -463,7 +493,8 @@ class _ChessGameScreenState extends State<ChessScreen> {
       // End Call
       _signalingService.sendEndCall();
       await _signalingService.stopAudio();
-      await MqttService().stopAudio(); // Stop calling ringtone if any
+      await MqttService().stopAudio(broadcast: true); // Stop calling ringtone if any
+      _stopCallTimer();
       setState(() {
         _isAudioOn = false;
         _isIncomingCall = false;
@@ -475,6 +506,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
         if (_isIncomingCall) {
           // Accept
           await _signalingService.acceptCall(_localRenderer, _remoteRenderer);
+          _startCallTimer();
           setState(() {
             _isAudioOn = true;
             _isIncomingCall = false;
@@ -508,7 +540,8 @@ class _ChessGameScreenState extends State<ChessScreen> {
         }
       } catch (e) {
         print("❌ Error starting audio call: $e");
-        MqttService().stopAudio(); // Stop ringtone on error
+        MqttService().stopAudio(broadcast: true); // Stop ringtone on error
+        _stopCallTimer();
         setState(() {
            _isCalling = false;
         });
@@ -2021,121 +2054,6 @@ class _ChessGameScreenState extends State<ChessScreen> {
                 ),
               ),
 
-              // CALL BANNERS SECTION
-              
-              // Outgoing Call Banner
-              if (_isCalling && !_isAudioOn)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[800],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text(
-                        "Calling...",
-                        style: TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(width: 16),
-                      GestureDetector(
-                        onTap: () async {
-                          // User cancels call
-                          await _toggleAudio();
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.call_end,
-                              color: Colors.white, size: 20),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              // Active Call Banner
-              if (_isAudioOn && !_showIncomingCallBanner)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.green[800],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.mic, color: Colors.white, size: 20),
-                      const SizedBox(width: 8),
-                      const Text(
-                        "Voice Connected",
-                        style: TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(width: 16),
-                      GestureDetector(
-                        onTap: _toggleMute,
-                        child: Icon(
-                          _isMuted ? Icons.mic_off : Icons.mic,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      GestureDetector(
-                        onTap: () async {
-                          await _toggleAudio();
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.call_end,
-                              color: Colors.white, size: 20),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              // Incoming Call Banner
-              if (_showIncomingCallBanner)
-                CallNotificationBanner(
-                  callerName: _incomingCallFrom,
-                  onAnswer: () async {
-                    await MqttService().stopAudio();
-                    setState(() {
-                      _showIncomingCallBanner = false;
-                      _isIncomingCall = true;
-                    });
-                    if (mounted) {
-                      await _toggleAudio();
-                    }
-                  },
-                  onDecline: () async {
-                    await MqttService().stopAudio();
-                    setState(() => _showIncomingCallBanner = false);
-                    await GameService.declineCall(
-                        callerUsername: _incomingCallFrom,
-                        roomId: _incomingCallRoomId);
-                  },
-                ),
-
               // Game Status with check indicator
               Container(
                 padding:
@@ -2364,6 +2282,140 @@ class _ChessGameScreenState extends State<ChessScreen> {
           ),
 
 
+
+          // --- FLOATING CALL PILLS ---
+          
+          // 1. Outgoing Call Pill (Calling...)
+          if (_isCalling && !_isAudioOn)
+            Positioned(
+              top: 10,
+              left: 20,
+              right: 20,
+              child: _buildCallPill(
+                color: Colors.blue[900]!.withOpacity(0.9),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      "Calling...",
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    const SizedBox(width: 16),
+                    _buildPillAction(
+                      icon: Icons.call_end,
+                      color: Colors.red,
+                      onTap: () async => await _toggleAudio(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // 2. Active Call Pill (Timer + Controls)
+          if (_isAudioOn && !_showIncomingCallBanner)
+            Positioned(
+              top: 10,
+              left: 20,
+              right: 20,
+              child: _buildCallPill(
+                color: Colors.green[900]!.withOpacity(0.9),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.mic, color: Colors.white, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      _formatDuration(_callDuration),
+                      style: const TextStyle(
+                        color: Colors.white, 
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace',
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    _buildPillAction(
+                      icon: _isMuted ? Icons.mic_off : Icons.mic,
+                      color: _isMuted ? Colors.red : Colors.grey[800]!,
+                      onTap: _toggleMute,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildPillAction(
+                      icon: Icons.call_end,
+                      color: Colors.red,
+                      onTap: () async => await _toggleAudio(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // 3. Incoming Call Pill (Answer / Decline)
+          if (_showIncomingCallBanner)
+             Positioned(
+              top: 10,
+              left: 20,
+              right: 20,
+              child: _buildCallPill(
+                color: Colors.grey[900]!.withOpacity(0.95),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            "Incoming Call",
+                            style: TextStyle(color: Colors.white70, fontSize: 10),
+                          ),
+                          Text(
+                            _incomingCallFrom,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    _buildPillAction(
+                      icon: Icons.call,
+                      color: Colors.green,
+                      onTap: () async {
+                        await MqttService().stopAudio(broadcast: true);
+                        setState(() {
+                          _showIncomingCallBanner = false;
+                          _isIncomingCall = true;
+                        });
+                        if (mounted) await _toggleAudio();
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    _buildPillAction(
+                      icon: Icons.call_end,
+                      color: Colors.red,
+                      onTap: () async {
+                        await MqttService().stopAudio(broadcast: true);
+                        setState(() => _showIncomingCallBanner = false);
+                        await GameService.declineCall(
+                          callerUsername: _incomingCallFrom,
+                          roomId: _incomingCallRoomId,
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -2410,6 +2462,49 @@ class _ChessGameScreenState extends State<ChessScreen> {
                 );
               }).toList(),
             ),
+    );
+  }
+
+  // Helper to build a styled pill container
+  Widget _buildCallPill({required Color color, required Widget child}) {
+    return Center(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(30),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: Colors.white10, width: 1),
+              boxShadow: const [
+                BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)),
+              ],
+            ),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Helper for pill action buttons
+  Widget _buildPillAction({
+    required IconData icon, 
+    required Color color, 
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: Colors.white, size: 16),
+      ),
     );
   }
 }
