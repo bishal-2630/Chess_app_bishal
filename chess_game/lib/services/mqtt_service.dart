@@ -196,7 +196,7 @@ class MqttService {
 
         // Handle Game Invitation Actions
         if (type == 'game_invitation' || type == 'game_challenge') {
-          if (response.actionId == 'decline_action' || response.actionId == 'decline') {
+            await cancelCallNotification();
             print('❌ [FG-FATAL] ACTION: DECLINE GAME');
             final rawId = payloadMap?['id'];
             final invitationId = int.tryParse(rawId.toString());
@@ -208,7 +208,6 @@ class MqttService {
               );
               print('✅ [FG] Decline SUCCESS');
             }
-            await cancelCallNotification();
             return;
           } else if (response.actionId == 'accept') {
             print('✅ [FG] ACTION: ACCEPT GAME');
@@ -222,7 +221,7 @@ class MqttService {
         
         // Handle Call Invitation Actions
         if (type == 'call_invitation' || type == 'incoming_call') {
-          if (response.actionId == 'decline_action' || response.actionId == 'decline') {
+            await cancelCallNotification();
             print('❌ [FG-FATAL] ACTION: DECLINE CALL');
             if (payloadMap != null) {
               final caller = payloadMap['caller'] ?? payloadMap['sender'];
@@ -237,9 +236,8 @@ class MqttService {
                   print('✅ [FG-FATAL] Decline SUCCESS');
               }
             }
-            await cancelCallNotification();
             return;
-          } else if (response.actionId == 'accept') {
+          } else if (response.actionId == 'accept' || response.actionId == 'accept_action') {
             print('✅ [FG] ACTION: ACCEPT CALL');
             _isInCall = true; // Mark as in-call to prevent further ringing
             
@@ -383,32 +381,31 @@ class MqttService {
         roomId,
         json.encode(data),
       );
-    } else if (type == 'call_declined') {
+    } else if (type == 'call_declined' || type == 'call_ended') {
       final String? roomId = payload != null ? payload['room_id']?.toString() : null;
       
       if (roomId != null) {
         ignoreRoom(roomId);
         stopAudio(broadcast: true, roomId: roomId);
-        
-        if (_currentCallRoomId == roomId) {
-          cancelCallNotification(roomId: roomId);
-        }
+        cancelCallNotification(roomId: roomId); 
       } else {
         cancelCallNotification();
       }
     } else if (type == 'call_cancelled') {
         final String? roomId = payload != null ? payload['room_id']?.toString() : null;
-        final String? sender = payload != null ? (payload['sender'] ?? payload['caller']) : null; // sender/caller is the person who initiated the call
+        final String? sender = payload != null ? (payload['sender'] ?? payload['caller']) : null; 
 
         if (roomId != null) {
           ignoreRoom(roomId);
           stopAudio(broadcast: true, roomId: roomId);
-          cancelCallNotification(roomId: roomId); // Stop ringing notification
+          cancelCallNotification(roomId: roomId); 
           
           // Show Missed Call Notification
           if (sender != null) {
              _showMissedCallNotification(sender);
           }
+        } else {
+           cancelCallNotification();
         }
     }
     
@@ -555,8 +552,12 @@ class MqttService {
 
   Future<void> cancelCallNotification({String? roomId}) async {
     // Standardize IDs: game=888, call=999
-    await flutterLocalNotificationsPlugin.cancel(888);
-    await flutterLocalNotificationsPlugin.cancel(999);
+    try {
+      await flutterLocalNotificationsPlugin.cancel(888).catchError((_) {});
+      await flutterLocalNotificationsPlugin.cancel(999).catchError((_) {});
+    } catch (e) {
+      print('Notification cancellation error: $e');
+    }
     
     // Broadcast cancellation to other isolates
     for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
@@ -568,13 +569,10 @@ class MqttService {
       }
     }
     
-    // Prioritize the passed roomId, then the current one
     final String? roomIdToStop = roomId ?? _currentCallRoomId;
     
     if (roomIdToStop != null) {
       _declinedRoomIds.add(roomIdToStop);
-      
-      // Auto-clear after 1 minute
       Future.delayed(const Duration(minutes: 1), () {
         _declinedRoomIds.remove(roomIdToStop);
       });
@@ -636,12 +634,21 @@ class MqttService {
     _isAudioLoading = true;
 
     try {
-      
+      // Final Check before starting
+      if (_isMutedWindow || _isInCall || (roomId != null && _declinedRoomIds.contains(roomId))) {
+        _isPlaying = false;
+        _isAudioLoading = false;
+        return;
+      }
+
       // Reset player mode
       await _audioPlayer.setReleaseMode(ReleaseMode.loop).catchError((_) {});
       await _audioPlayer.setVolume(1.0).catchError((_) {});
 
-      if (!_isPlaying) return;
+      if (!_isPlaying) {
+        _isAudioLoading = false;
+        return;
+      }
 
       // Play the asset
       await _audioPlayer.play(AssetSource(fileName)).catchError((e) {
@@ -655,6 +662,7 @@ class MqttService {
       if (!_isPlaying) {
         await _audioPlayer.stop().catchError((_) {});
         await _audioPlayer.setVolume(0).catchError((_) {});
+        await _audioPlayer.release().catchError((_) {});
       }
     } catch (e) {
       print('MQTT [$isolateName]: Error in playSound: $e');
@@ -677,6 +685,9 @@ class MqttService {
     _currentCallRoomId = null; 
 
     try {
+      // Immediate silence
+      await _audioPlayer.setVolume(0).catchError((_) {});
+      await _audioPlayer.stop().catchError((_) {});
       await _audioPlayer.release().catchError((e) {
       });
       
@@ -684,6 +695,7 @@ class MqttService {
       print('Stop error: $e');
     }
     
+    // Safety: ensure muted window expires but prevents immediate re-trigger during cancellation flows
     Future.delayed(const Duration(seconds: 3), () {
       _isMutedWindow = false;
     });
