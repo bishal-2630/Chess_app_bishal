@@ -117,13 +117,15 @@ class MqttService {
             category: AVAudioSessionCategory.playback,
           ),
           android: AudioContextAndroid(
-            usageType: AndroidUsageType.voiceCommunication,
+            usageType: AndroidUsageType.notification,
             contentType: AndroidContentType.music,
             audioFocus: AndroidAudioFocus.gain,
           ),
         );
-        AudioLogger.logLevel = AudioLogLevel.none;
-        await AudioPlayer.global.setAudioContext(audioContext).catchError((_) {});
+        AudioLogger.logLevel = AudioLogLevel.info;
+        await AudioPlayer.global.setAudioContext(audioContext).catchError((e) {
+          print('⚠️ MQTT: Global audio context error: $e');
+        });
       } catch (e) {
         print('⚠️ MQTT: Global audio context error: $e');
       }
@@ -714,19 +716,49 @@ class MqttService {
       }
 
       // Reset player mode
-      await _audioPlayer.setReleaseMode(ReleaseMode.loop).catchError((_) {});
-      await _audioPlayer.setVolume(1.0).catchError((_) {});
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop).catchError((e) {
+        print('MQTT [$isolateName]: Error setting release mode: $e');
+      });
+      await _audioPlayer.setVolume(1.0).catchError((e) {
+        print('MQTT [$isolateName]: Error setting volume: $e');
+      });
+
+      // Reinforce Audio Context (in case WebRTC or other service changed it)
+      const audioContext = AudioContext(
+        iOS: AudioContextIOS(category: AVAudioSessionCategory.playback),
+        android: AudioContextAndroid(
+          usageType: AndroidUsageType.notification,
+          contentType: AndroidContentType.music,
+          audioFocus: AndroidAudioFocus.gain,
+        ),
+      );
+      await AudioPlayer.global.setAudioContext(audioContext).catchError((e) {
+        print('MQTT [$isolateName]: Context reinforcement error: $e');
+      });
 
       if (!_isPlaying) {
         _isAudioLoading = false;
+        print('MQTT [$isolateName]: Aborting play - _isPlaying became false during context setup');
         return;
       }
 
+      // Clean path (remove 'assets/' prefix if if play() handles it automatically via AssetSource)
+      // audioplayers 5.x AssetSource expectation: 'sounds/ringtone.mp3' (relative to assets/ folder usually)
+      String cleanFileName = fileName;
+      if (cleanFileName.startsWith('assets/')) {
+        cleanFileName = cleanFileName.replaceFirst('assets/', '');
+      }
+
+      print('MQTT [$isolateName]: Final Path to Play: $cleanFileName');
+
       // Play the asset
-      await _audioPlayer.play(AssetSource(fileName)).catchError((e) {
-        print('MQTT [$isolateName]: Play error: $e');
+      await _audioPlayer.play(AssetSource(cleanFileName)).catchError((e) {
+        print('MQTT [$isolateName]: CRITICAL Play error: $e');
         _isPlaying = false;
       });
+      
+      // Explicit resume just in case play() only sets the source
+      await _audioPlayer.resume().catchError((_) {});
       
       _isAudioLoading = false;
 
@@ -737,7 +769,7 @@ class MqttService {
         await _audioPlayer.release().catchError((_) {});
       }
     } catch (e) {
-      print('MQTT [$isolateName]: Error in playSound: $e');
+      print('MQTT [$isolateName]: EXCEPTION in playSound: $e');
       _isPlaying = false;
       _isAudioLoading = false;
     }

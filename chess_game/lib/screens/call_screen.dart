@@ -42,13 +42,12 @@ class _CallScreenState extends State<CallScreen> {
     print("📞 CallScreen: initState called");
     MqttService().setInCall(true); // Mark as in-call
     
-    // Stop all audio immediately upon entering CallScreen
-    MqttService().stopAudio().then((_) {
-      // For Callee, also cancel notification if still there
-      if (!widget.isCaller) {
+    // For Callee, stop the incoming ringtone and cancel notification
+    if (!widget.isCaller) {
+      MqttService().stopAudio().then((_) {
         MqttService().cancelCallNotification();
-      }
-    });
+      });
+    }
     _initRenderers();
     _connect();
     _listenForDecline();
