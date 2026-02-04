@@ -333,22 +333,28 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: _isLoading ? null : _signInWithGoogle,
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size(double.infinity, 50),
-                        side: const BorderSide(color: Colors.blue),
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black87,
+                        side: BorderSide(color: Colors.grey[300]!),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
+                        elevation: 0,
                       ),
                       icon: Image.asset(
                         'assets/google_logo.png',
                         width: 24,
                         height: 24,
                         errorBuilder: (context, error, stackTrace) {
-                          return const Icon(Icons.g_mobiledata, size: 24);
+                          return const Icon(Icons.g_mobiledata, size: 28, color: Colors.blue);
                         },
                       ),
                       label: const Text(
                         'Sign in with Google',
-                        style: TextStyle(color: Colors.blue),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
 

@@ -50,6 +50,7 @@ class MqttService {
   static bool _isMutedWindow = false; // Prevents re-ring within a short window
   bool _isInCall = false; 
   static String? _currentCallRoomId;
+  static String? _activeChessRoomId; // TRACK ACTIVE GAME ROOM
   static final Set<String> _declinedRoomIds = {};
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -191,6 +192,9 @@ class MqttService {
           if (id != null) {
             await flutterLocalNotificationsPlugin.cancel(id);
           }
+        } else if (message['action'] == 'set_active_room') {
+          _activeChessRoomId = message['roomId']?.toString();
+          print('🎮 Isolate ($portName) activeChessRoomId SYNCED: $_activeChessRoomId');
         }
       }
     });
@@ -397,6 +401,24 @@ class MqttService {
       // Check if we are already ringing for this exact room
       if (_isPlaying && _currentCallRoomId == roomId) {
         return;
+      }
+
+      // Suppress system notification if we are already in the Chess Screen for THIS room
+      // Use .toString() to be safe with int vs string room IDs
+      final String? normalizedIncomingRoomId = roomId?.toString();
+      final String? normalizedActiveRoomId = _activeChessRoomId?.toString();
+      
+      print('🔍 MQTT: Room Check - Incoming: $normalizedIncomingRoomId, Active: $normalizedActiveRoomId');
+
+      if (normalizedActiveRoomId != null && normalizedActiveRoomId == normalizedIncomingRoomId) {
+        print('🚫 MQTT: Suppressing system notification but PLAYING SOUND for active in-game call in room: $roomId');
+        
+        // playSound immediately (requested by user for audible alert)
+        playSound('sounds/ringtone.mp3', roomId: normalizedIncomingRoomId);
+
+        // We still emit the notification so the ChessScreen AppBar can catch it
+        _notificationController.add(data);
+        return; 
       }
 
       _currentCallRoomId = roomId;
@@ -681,6 +703,22 @@ class MqttService {
   
   void setInCall(bool inCall) {
     _isInCall = inCall;
+  }
+
+  void setActiveChessRoomId(String? roomId, {bool broadcast = true}) {
+    final String? normalizedId = roomId?.toString();
+    print('🎮 MQTT: Setting active chess room ID to: $normalizedId (broadcast=$broadcast)');
+    _activeChessRoomId = normalizedId;
+
+    if (broadcast) {
+      for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
+        final sendPort = IsolateNameServer.lookupPortByName(portName);
+        if (sendPort != null) {
+          print('📡 MQTT: Sending active room sync to $portName: $normalizedId');
+          sendPort.send({'action': 'set_active_room', 'roomId': normalizedId});
+        }
+      }
+    }
   }
 
   // Ongoing call notification methods
