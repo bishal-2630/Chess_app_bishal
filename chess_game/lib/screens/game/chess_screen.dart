@@ -3,7 +3,6 @@ import 'dart:ui';
 import 'package:go_router/go_router.dart';
 import '../../services/signaling_service.dart';
 import '../../services/django_auth_service.dart';
-import '../../services/notification_service.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:flutter/foundation.dart';
 import '../../services/config.dart';
@@ -26,7 +25,6 @@ class ChessScreen extends StatefulWidget {
 
 class _ChessGameScreenState extends State<ChessScreen> {
   final DjangoAuthService _authService = DjangoAuthService();
-  final NotificationService _notificationService = NotificationService();
 
   // Chess board state
   List<List<String>> board = [];
@@ -113,27 +111,21 @@ class _ChessGameScreenState extends State<ChessScreen> {
     // Refresh invite count every 30 seconds
     _inviteTimer =
         Timer.periodic(const Duration(seconds: 30), (_) => _loadInviteCount());
-    // NotificationService is now connected globally upon login
+    // MqttService handles notifications globally
 
     // Listen for incoming calls during gameplay
     _callNotificationSubscription = MqttService().notifications.listen((data) {
       if (!mounted) return;
 
       final type = data['type'];
-      print('♟️ ChessScreen MQTT: Received type=$type'); // DEBUG LOG
-
       if (type == 'call_invitation' || type == 'incoming_call') {
         final payload = data['data'] ?? data['payload'];
         final caller = payload['caller'] ?? payload['sender'];
         final roomId = payload['room_id'];
 
-        print(
-            '♟️ ChessScreen MQTT: Call Inv - RoomId: $roomId, MyRoom: ${widget.roomId}, Connected: $_isConnectedToRoom'); // DEBUG LOG
-
         // If user is in a chess room, show banner and cancel system notification
         if (_isConnectedToRoom) {
           // Cancel system notification in favor of in-app banner
-          // Use dismissCallNotification to avoid stopping audio or ignoring room
           MqttService().dismissCallNotification();
 
           setState(() {
@@ -141,8 +133,6 @@ class _ChessGameScreenState extends State<ChessScreen> {
             _incomingCallFrom = caller ?? 'Unknown';
             _incomingCallRoomId = roomId ?? '';
           });
-
-          // Ringtone is already playing from MqttService
         }
         // If user is not in a room, system notification will handle it
         // (MqttService already shows notification and plays ringtone)
@@ -176,7 +166,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
         });
       }
     } catch (e) {
-      print('Error loading invite count: $e');
+      // Error loading invite count
     }
   }
 
@@ -185,8 +175,6 @@ class _ChessGameScreenState extends State<ChessScreen> {
     super.didUpdateWidget(oldWidget);
     // If room info changes while already on the board, reconnect
     if (widget.roomId != oldWidget.roomId && widget.roomId != null) {
-      print(
-          "🔄 Room ID changed from ${oldWidget.roomId} to ${widget.roomId}. Reconnecting...");
       _playerColor = widget.color ?? 'w';
       _connectRoom(_defaultServerUrl, widget.roomId!);
     }
@@ -198,19 +186,16 @@ class _ChessGameScreenState extends State<ChessScreen> {
 
     _signalingService.onAddRemoteStream = ((stream) {
       _remoteRenderer.srcObject = stream;
-      // _setEphemeralStatus("Voice Connected"); // Handled by banner
     });
 
     _signalingService.onGameMove = (data) {
       // Handle remote move
-      print("Received move: $data");
       setState(() {
         _handleRemoteMove(data);
       });
     };
 
     _signalingService.onPlayerLeft = () {
-      print("Opponent left");
 
       // If game was active, record as a win for this player
       if (!gameOver && moveHistory.isNotEmpty) {
@@ -281,7 +266,6 @@ class _ChessGameScreenState extends State<ChessScreen> {
           _isIncomingCall = false;
           _isCalling = false;
         });
-        // _setEphemeralStatus("Call Ended"); // Optional
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text("Call ended."), duration: Duration(seconds: 2)));
       }
@@ -433,7 +417,6 @@ class _ChessGameScreenState extends State<ChessScreen> {
 
   @override
   void dispose() {
-    print("🧹 Disposing ChessScreen state");
     // NEW: Clear active room ID so notifications are restored for future sessions
     MqttService().setActiveChessRoomId(null);
     _statusTimer?.cancel();
@@ -472,13 +455,10 @@ class _ChessGameScreenState extends State<ChessScreen> {
     String fullUrl = serverUrl;
     if (!fullUrl.endsWith("/")) fullUrl += "/";
     fullUrl += "$roomId/";
-    print("📡 DEBUG: Connecting to Room URL: $fullUrl");
-
     setState(() {
       _callStatus = "Connecting...";
     });
 
-    print("Connecting to $fullUrl");
     final token = _authService.accessToken;
     _signalingService.connect(fullUrl, token: token);
 
@@ -501,7 +481,6 @@ class _ChessGameScreenState extends State<ChessScreen> {
     if (_isAudioOn || (_isCalling && !_isAudioOn)) {
       // End Call or Cancel Outgoing Call
       if (_isCalling && !_isAudioOn && widget.opponentName != null && widget.roomId != null) {
-        print("📞 Caller canceling call early. Signaling backend...");
         await GameService.cancelCall(
           receiverUsername: widget.opponentName!,
           roomId: widget.roomId!,
@@ -531,7 +510,6 @@ class _ChessGameScreenState extends State<ChessScreen> {
           });
           // Force clear system notifications on accept
           await MqttService().cancelCallNotification(broadcast: true);
-          // _setEphemeralStatus("Call Connected"); // Handled by banner
         } else {
           // Start Call (Initiator part)
           if (widget.opponentName == null) {
@@ -558,7 +536,6 @@ class _ChessGameScreenState extends State<ChessScreen> {
           await _signalingService.startCall(_localRenderer, _remoteRenderer);
         }
       } catch (e) {
-        print("❌ Error starting audio call: $e");
         MqttService().stopAudio(broadcast: true); // Stop ringtone on error
         _stopCallTimer();
         setState(() {

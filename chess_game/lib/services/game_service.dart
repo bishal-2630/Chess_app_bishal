@@ -27,15 +27,6 @@ class GameService {
     int retryCount = 0,
   }) async {
     headers ??= await _getAuthHeaders();
-    
-    print('🌐 [API] $method $url');
-    // Don't log full body for security, but log the keys
-    if (body != null) {
-      try {
-        final decoded = json.decode(body as String);
-        print('📦 [API] Keys: ${decoded.keys.toList()}');
-      } catch (_) {}
-    }
 
     http.Response response;
     try {
@@ -45,11 +36,8 @@ class GameService {
         response = await http.get(Uri.parse(url), headers: headers);
       }
 
-      print('📡 [API] Response: ${response.statusCode}');
-
       // Check for token expiration (401)
       if (response.statusCode == 401 && retryCount < 1) {
-        print('🔄 401 Unauthorized - Attempting token refresh...');
         final refreshed = await DjangoAuthService().refreshToken();
         if (refreshed) {
           // Retry with new token
@@ -59,7 +47,6 @@ class GameService {
       }
       return response;
     } catch (e) {
-      print('❌ [API] Error: $e');
       rethrow;
     }
   }
@@ -95,12 +82,8 @@ class GameService {
         '${_baseUrl}users/all/',
       );
 
-      print('📡 Users API Response: ${response.statusCode}');
-      print('📦 Body: ${response.body}');
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        print('📋 Users parsed: ${data['users']}');
         return {
           'success': true,
           'users': data['users'],
@@ -276,14 +259,11 @@ class GameService {
       );
 
       if (response.statusCode == 200) {
-        print('✅ Call signal sent to $receiverUsername');
         return {'success': true};
       } else {
-        print('❌ Call signal failed: ${response.statusCode}');
         return {'success': false, 'error': 'Failed to send call signal'};
       }
     } catch (e) {
-      print('❌ CALL SIGNAL: Exception - ${e.toString()}');
       return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }
@@ -304,14 +284,11 @@ class GameService {
       );
 
       if (response.statusCode == 200) {
-        print('✅ Call decline sent to $callerUsername');
         return {'success': true};
       } else {
-        print('❌ Call decline failed: ${response.statusCode}');
         return {'success': false, 'error': 'Failed to decline call'};
       }
     } catch (e) {
-      print('❌ CALL DECLINE: Exception - ${e.toString()}');
       return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }
@@ -332,14 +309,11 @@ class GameService {
       );
 
       if (response.statusCode == 200) {
-        print('✅ Call cancel signal sent to $receiverUsername');
         return {'success': true};
       } else {
-        print('❌ Call cancel failed: ${response.statusCode}');
         return {'success': false, 'error': 'Failed to cancel call signal'};
       }
     } catch (e) {
-      print('❌ CALL CANCEL: Exception - ${e.toString()}');
       return {'success': false, 'error': 'Network error: ${e.toString()}'};
     }
   }

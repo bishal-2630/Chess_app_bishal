@@ -106,7 +106,6 @@ class _LoginScreenState extends State<LoginScreen> {
         _showErrorSnackBar(result['error'] ?? 'Sign in cancelled');
       }
     } catch (e) {
-      print('Google sign-in error: $e');
       _showErrorSnackBar('Google sign-in failed: ${e.toString()}');
     } finally {
       if (context.mounted) {

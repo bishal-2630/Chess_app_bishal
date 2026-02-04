@@ -58,11 +58,10 @@ class MqttService {
 
   Future<void> initialize() async {
     if (!isMainIsolate) {
-      print('MQTT: Skipping full initialization in non-main isolate to prevent callback wipe');
       return;
     }
     
-    print('MQTT: Starting Main Isolate Initialization...');
+    
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     
@@ -71,14 +70,12 @@ class MqttService {
     );
     
     if (isMainIsolate) {
-      print('MQTT: Registering full notification callbacks (Main Isolate)');
       await flutterLocalNotificationsPlugin.initialize(
         initializationSettings,
         onDidReceiveNotificationResponse: onNotificationTapped,
         onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
       );
     } else {
-      print('MQTT: Registering background-safe callbacks (Non-Main Isolate)');
       await flutterLocalNotificationsPlugin.initialize(
         initializationSettings,
         onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
@@ -148,24 +145,16 @@ class MqttService {
 
     // Request notification permissions ONLY in Main Isolate (requires Activity)
     if (isMainIsolate) {
-      print('MQTT: Main Isolate detected, requesting permissions...');
       final bool? permissionGranted = await androidPlugin?.requestNotificationsPermission();
-      if (permissionGranted == false) {
-        print('MQTT: Notification permission denied');
-      }
-    } else {
-      print('MQTT: Isolate skipping permission request (isMainIsolate=false)');
     }
   }
   
   void initializeIsolateListener({bool isBackground = false}) {
     final portName = isBackground ? 'chess_game_bg_port' : 'chess_game_main_port';
-    print("🔔 Initializing Isolate Listener: $portName");
     IsolateNameServer.removePortNameMapping(portName);
     IsolateNameServer.registerPortWithName(_listenerPort.sendPort, portName);
     
     _listenerPort.listen((message) async {
-      print('🔔 Isolate ($portName) received message: $message');
       if (message == 'stop_audio') {
         await stopAudio(broadcast: false);
       } else if (message is Map) {
@@ -194,37 +183,29 @@ class MqttService {
           }
         } else if (message['action'] == 'set_active_room') {
           _activeChessRoomId = message['roomId']?.toString();
-          print('🎮 Isolate ($portName) activeChessRoomId SYNCED: $_activeChessRoomId');
         }
       }
     });
   }
 
   void onNotificationTapped(NotificationResponse response) async {
-    print('🚨🚨🚨 [FG-FATAL] NOTIFICATION ACTION TRIGGERED! Action="${response.actionId}"');
-    print('🚨🚨🚨 [FG-FATAL] Raw Payload: ${response.payload}');
-    
     if (response.payload != null) {
       try {
         final Map<String, dynamic> data = json.decode(response.payload!);
         final payloadMap = (data['data'] ?? data['payload']) as Map<String, dynamic>?;
         final type = data['type'];
-        print('🚨🚨🚨 [FG-FATAL] type=$type, actionId=${response.actionId}');
 
         // Handle Game Invitation Actions
         if (type == 'game_invitation' || type == 'game_challenge') {
           if (response.actionId == 'decline_action' || response.actionId == 'decline') {
             await cancelCallNotification();
-            print('❌ [FG-FATAL] ACTION: DECLINE GAME');
             final rawId = payloadMap?['id'];
             final invitationId = int.tryParse(rawId.toString());
             if (invitationId != null) {
-              print('📡 [FG] Sending Decline Signal ID: $invitationId');
               await GameService.respondToInvitation(
                 invitationId: invitationId,
                 action: 'decline',
               );
-              print('✅ [FG] Decline SUCCESS');
             }
             return;
           } else if (response.actionId == 'accept') {
@@ -241,18 +222,15 @@ class MqttService {
         if (type == 'call_invitation' || type == 'incoming_call') {
           if (response.actionId == 'decline_action' || response.actionId == 'decline') {
             await cancelCallNotification();
-            print('❌ [FG-FATAL] ACTION: DECLINE CALL');
             if (payloadMap != null) {
               final caller = payloadMap['caller'] ?? payloadMap['sender'];
               final roomId = payloadMap['room_id']?.toString();
               
               if (caller != null && roomId != null) {
-                  print('📡 [FG-FATAL] Sending Decline Signal to: $caller');
                   await GameService.declineCall(
                     callerUsername: caller,
                     roomId: roomId,
                   );
-                  print('✅ [FG-FATAL] Decline SUCCESS');
               }
             }
             return;
@@ -287,7 +265,6 @@ class MqttService {
         }
 
         // Handle regular notification tap (no action button pressed)
-        print('👉 [FG] Manual Tap - Emitting notification data');
         _emitNotification(data);
       } catch (e) {
         print('❌ [FG] Error: $e');
@@ -300,7 +277,6 @@ class MqttService {
   String? _currentUsername;
 
   Future<void> connect(String username) async {
-    print('🔌 MQTT: connect() called for username: $username');
     if (isConnected) {
       print('⚠️ MQTT: Already connected, skipping');
       return;
@@ -324,9 +300,7 @@ class MqttService {
     client!.connectionMessage = connMess;
 
     try {
-      print('🔌 MQTT: Attempting connection to $broker:$port...');
       await client!.connect();
-      print('🔌 MQTT: Connection attempt completed');
     } on Exception catch (e) {
       print('❌ MQTT: Connection failed - $e');
       disconnect();
@@ -338,7 +312,6 @@ class MqttService {
 
     if (client!.connectionStatus!.state == MqttConnectionState.connected) {
       isConnected = true;
-      print('✅ MQTT: Connected successfully');
       _subscribeToNotifications(username);
       _listen();
     } else {
@@ -365,7 +338,6 @@ class MqttService {
       final String pt =
           MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
 
-      print('MQTT: Message received on topic: $topic');
       try {
         final data = json.decode(pt);
         _handleNotification(data);
@@ -408,8 +380,6 @@ class MqttService {
       final String? normalizedIncomingRoomId = roomId?.toString();
       final String? normalizedActiveRoomId = _activeChessRoomId?.toString();
       
-      print('🔍 MQTT: Room Check - Incoming: $normalizedIncomingRoomId, Active: $normalizedActiveRoomId');
-
       if (normalizedActiveRoomId != null && normalizedActiveRoomId == normalizedIncomingRoomId) {
         print('🚫 MQTT: Suppressing system notification but PLAYING SOUND for active in-game call in room: $roomId');
         
@@ -707,18 +677,14 @@ class MqttService {
 
   void setActiveChessRoomId(String? roomId, {bool broadcast = true}) {
     final String? normalizedId = roomId?.toString();
-    print('🎮 MQTT: Setting active chess room ID to: $normalizedId (broadcast=$broadcast)');
     _activeChessRoomId = normalizedId;
 
-    if (broadcast) {
       for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
         final sendPort = IsolateNameServer.lookupPortByName(portName);
         if (sendPort != null) {
-          print('📡 MQTT: Sending active room sync to $portName: $normalizedId');
           sendPort.send({'action': 'set_active_room', 'roomId': normalizedId});
         }
       }
-    }
   }
 
   // Ongoing call notification methods
@@ -779,7 +745,6 @@ class MqttService {
   }
 
   void onConnected() {
-    print('✅ MQTT: OnConnected callback triggered');
     isConnected = true;
     if (_currentUsername != null && _isListening == false) {
       _subscribeToNotifications(_currentUsername!);
@@ -788,7 +753,6 @@ class MqttService {
   }
 
   void onDisconnected() {
-    print('MQTT: OnDisconnected');
     isConnected = false;
   }
 
@@ -819,8 +783,7 @@ class MqttService {
 
     _isPlaying = true;
     _isAudioLoading = true;
-    print('MQTT [$isolateName]: Attempting to play sound: $fileName');
-
+    
     try {
       // Final Check before starting
       if (_isMutedWindow || _isInCall || (roomId != null && _declinedRoomIds.contains(roomId))) {

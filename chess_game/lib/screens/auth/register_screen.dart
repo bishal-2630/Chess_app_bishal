@@ -73,7 +73,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _showErrorSnackBar(result['error'] ?? 'Registration cancelled');
       }
     } catch (e) {
-      print('Google registration error: $e');
       _showErrorSnackBar('Google registration failed: ${e.toString()}');
     } finally {
       if (context.mounted) {

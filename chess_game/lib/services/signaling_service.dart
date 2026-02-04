@@ -48,7 +48,6 @@ class SignalingService {
     // Clean up any existing connection first
     await disconnect();
 
-    print('Connecting to signaling server: $socketUrl');
     try {
       String urlWithToken = socketUrl;
       final headers = {'ngrok-skip-browser-warning': 'true'};
@@ -65,13 +64,10 @@ class SignalingService {
 
       _channel!.stream.listen((message) {
         try {
-          print('📞 Received message: $message');
           _onMessage(jsonDecode(message));
         } catch (e) {
-          print('❌ Error parsing/handling message: $e');
         }
       }, onDone: () {
-        print('WebSocket Closed');
         if (onConnectionState != null) onConnectionState!(false);
       }, onError: (error) {
         print('WebSocket Error: $error');
@@ -145,7 +141,7 @@ class SignalingService {
         }
         break;
       default:
-        print('Unknown message type: $type');
+        // Unknown message type
     }
   }
 
@@ -225,11 +221,8 @@ class SignalingService {
 
     _peerConnection!.onIceCandidate = (RTCIceCandidate? candidate) {
       if (candidate == null) {
-        print("✅ ICE Gathering Complete (Null Candidate Signal)");
         return;
       }
-      print(
-          "📞 ICE Candidate generated: ${candidate.candidate?.substring(0, min(20, candidate.candidate?.length ?? 0))}...");
       _send('candidate', {
         'candidate': candidate.candidate,
         'sdpMid': candidate.sdpMid,
@@ -238,19 +231,15 @@ class SignalingService {
     };
 
     _peerConnection!.onIceConnectionState = (RTCIceConnectionState state) {
-      print("🧊 ICE Connection State: $state");
     };
 
     _peerConnection!.onIceGatheringState = (RTCIceGatheringState state) {
-      print("📶 ICE Gathering State: $state");
     };
 
     _peerConnection!.onSignalingState = (RTCSignalingState state) {
-      print("📡 Signaling State: $state");
     };
 
     _peerConnection!.onTrack = (RTCTrackEvent event) {
-      print("🎵 Remote track received: ${event.track.kind}");
       if (event.streams.isNotEmpty && onAddRemoteStream != null) {
         onAddRemoteStream!(event.streams[0]);
       }
@@ -258,7 +247,6 @@ class SignalingService {
 
     // Add local stream
     if (_localStream != null && _peerConnection != null) {
-      print("📞 Adding local tracks to PeerConnection");
       _localStream!.getTracks().forEach((track) {
         if (_peerConnection != null) {
           _peerConnection!.addTrack(track, _localStream!);
@@ -294,7 +282,6 @@ class SignalingService {
   Future<void> _handleAnswer(Map<String, dynamic> data) async {
     try {
       if (_peerConnection == null) {
-        print("⚠️ Cannot handle answer: PeerConnection is null");
         return;
       }
       print("📞 Setting remote description (answer)");
@@ -304,7 +291,6 @@ class SignalingService {
       if (_peerConnection == null) return;
 
       await _peerConnection!.setRemoteDescription(description);
-      print("✅ Remote description set successfully");
     } catch (e) {
       print("❌ Error handling answer: $e");
     }
@@ -313,7 +299,6 @@ class SignalingService {
   Future<void> _handleCandidate(Map<String, dynamic> data) async {
     try {
       if (data['candidate'] == null) {
-        print("ℹ️ Peer signaled end of ICE candidates");
         return;
       }
 
@@ -321,10 +306,8 @@ class SignalingService {
           data['candidate'], data['sdpMid'], data['sdpMLineIndex']);
 
       if (_peerConnection != null) {
-        print("📞 Adding ICE candidate from remote");
         await _peerConnection!.addCandidate(candidate);
       } else {
-        print("⏳ Queueing ICE candidate (PC not ready)");
         _remoteCandidates.add(candidate);
       }
     } catch (e) {

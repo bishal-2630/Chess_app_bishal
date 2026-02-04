@@ -14,7 +14,6 @@ Future<bool> onIosBackground(ServiceInstance service) async {
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
   // Removed manual DartPluginRegistrant.ensureInitialized() as it triggers problematic UI plugin loads in BG
-  print('🚀 [BG-SERVICE] Isolate Starting...');
 
   // Check if user is logged in before connecting
   final authService = DjangoAuthService();
@@ -27,8 +26,6 @@ void onStart(ServiceInstance service) async {
   if (authService.isLoggedIn) {
     final username = authService.currentUser?['username'];
     if (username != null) {
-      print(
-          'Background Service: User logged in, connecting MQTT for $username');
       await mqttService.initialize();
       await mqttService.connect(username);
     }
@@ -41,7 +38,6 @@ void onStart(ServiceInstance service) async {
 
     if (type == 'stop_audio') {
       final roomId = payload != null ? payload['room_id'] : null;
-      print('Background Isolate: Standard signal received (stop_audio). RoomId: $roomId');
       if (roomId != null) {
         MqttService().ignoreRoom(roomId);
       }
@@ -50,14 +46,12 @@ void onStart(ServiceInstance service) async {
        final caller = data['caller'];
        final roomId = data['roomId'];
        if (caller != null && roomId != null) {
-         print('Background Isolate: Sending decline signal for $caller');
          await GameService.declineCall(callerUsername: caller, roomId: roomId);
        }
     } else if (type == 'respond_invitation') {
        final id = data['invitationId'];
        final action = data['action'];
        if (id != null && action != null) {
-         print('Background Isolate: Responding $action to invitation $id');
          await GameService.respondToInvitation(invitationId: id, action: action);
        }
     } else if (type == 'cancel_notification') {

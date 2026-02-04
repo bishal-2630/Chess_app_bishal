@@ -6,7 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/config.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import '../../services/notification_service.dart';
 import '../../services/mqtt_service.dart';
 
 class DjangoAuthService {
@@ -51,7 +50,6 @@ class DjangoAuthService {
     final userData = prefs.getString(_userKey);
     if (userData != null) {
       _currentUser = json.decode(userData);
-      print('💾 Loaded saved user: ${_currentUser?['email']}');
 
       // Auto-connect MQTT if we have a session
       if (autoConnectMqtt && _currentUser?['username'] != null) {
@@ -83,21 +81,17 @@ class DjangoAuthService {
   // Refresh Token
   Future<bool> refreshToken() async {
     if (_refreshToken == null) {
-      print('⚠️ No refresh token available');
       return false;
     }
 
     try {
       final url = '${_baseUrl}token/refresh/';
-      print('🔄 Refreshing token at: $url');
       
       final response = await http.post(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'refresh': _refreshToken}),
       );
-
-      print('📡 Refresh response: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -107,7 +101,6 @@ class DjangoAuthService {
           _refreshToken = data['refresh'];
         }
         await _saveAuthData();
-        print('✅ Token refreshed successfully');
         return true;
       } else {
         print('❌ Token refresh failed: ${response.body}');
@@ -115,7 +108,6 @@ class DjangoAuthService {
         return false;
       }
     } catch (e) {
-      print('❌ Error refreshing token: $e');
       return false;
     }
   }
@@ -125,26 +117,22 @@ class DjangoAuthService {
     _isGuest = true;
     _guestName = name;
     _currentUser = null;
-    print('👤 Logged in as Guest: $name');
   }
 
   // Guest logout
   void logoutGuest() {
     _isGuest = false;
     _guestName = null;
-    print('👤 Guest logged out');
   }
 
   // Email/Password Login
   Future<Map<String, dynamic>> signInWithEmailPassword(
       String email, String password) async {
     logoutGuest(); // Clear guest state
-    print('🔐 Attempting Django sign in with email: $email');
 
     try {
       // Use standard Django login endpoint
       final url = '${_baseUrl}login/';
-      print('🌐 Calling URL: $url');
       final response = await http.post(
         Uri.parse(url),
         headers: {
@@ -157,15 +145,11 @@ class DjangoAuthService {
         }),
       );
 
-      print('📡 Registration response status: ${response.statusCode}');
-      print('📦 Registration response body: ${response.body}');
-
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
 
         if (responseData['success'] == true) {
           _currentUser = responseData['user'];
-          print('✅ Django login successful: ${responseData['user']['email']}');
 
           // Store tokens if available
           if (responseData['tokens'] != null) {
@@ -182,7 +166,6 @@ class DjangoAuthService {
           };
         } else {
           final errorMessage = responseData['message'] ?? 'Login failed';
-          print('❌ Django login error: $errorMessage');
           return {
             'success': false,
             'error': errorMessage,
@@ -212,14 +195,12 @@ class DjangoAuthService {
           errorMessage = 'Network error during login: ${response.statusCode}';
         }
 
-        print('❌ Network error during login: $errorMessage');
         return {
           'success': false,
           'error': errorMessage,
         };
       }
     } catch (e) {
-      print('❌ Exception during login: $e');
       return {
         'success': false,
         'error': 'Network error: $e',
@@ -231,7 +212,6 @@ class DjangoAuthService {
   // Email/Password Registration
   Future<Map<String, dynamic>> registerWithEmailPassword(
       String email, String password, String username) async {
-    print('📝 Starting Django registration for: $email');
 
     try {
       final url = '${_baseUrl}register/';
@@ -248,9 +228,6 @@ class DjangoAuthService {
         }),
       );
 
-      print('📡 Registration response status: ${response.statusCode}');
-      print('📦 Registration response body: ${response.body}');
-
       if (response.statusCode == 201) {
         final responseData = json.decode(response.body);
 
@@ -262,11 +239,9 @@ class DjangoAuthService {
         // Handle cookies for web view
         String? rawCookie = response.headers['set-cookie'];
         if (rawCookie != null) {
-          print('🍪 Found cookies to inject');
           await _injectCookies(rawCookie);
         }
 
-        print('✅ Django registration successful: ${_currentUser?['email']}');
 
         return {'success': true, 'user': _currentUser, 'tokens': responseData};
       } else {
@@ -285,11 +260,9 @@ class DjangoAuthService {
           errorMessage = errorData['non_field_errors'][0];
         }
 
-        print('❌ Django registration error: $errorMessage');
         return {'success': false, 'error': errorMessage};
       }
     } catch (e) {
-      print('❌ Network error during registration: $e');
       return {
         'success': false,
         'error': 'Network error. Please check your connection.'
@@ -300,13 +273,11 @@ class DjangoAuthService {
   // Google Sign-In
   Future<Map<String, dynamic>> signInWithGoogle() async {
     logoutGuest(); // Clear guest state
-    print('🔄 Starting Google sign in');
 
     try {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
       if (googleUser == null) {
-        print('User cancelled Google sign in');
         return {'success': false, 'error': 'Sign in cancelled'};
       }
 
@@ -326,9 +297,6 @@ class DjangoAuthService {
           'id_token': googleAuth.idToken,
         }),
       );
-
-      print('📡 Google login response status: ${response.statusCode}');
-      print('📦 Google login response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
@@ -351,11 +319,9 @@ class DjangoAuthService {
         // Handle cookies for web view
         String? rawCookie = response.headers['set-cookie'];
         if (rawCookie != null) {
-          print('🍪 Found cookies to inject');
           await _injectCookies(rawCookie);
         }
 
-        print('✅ Google sign in successful: ${_currentUser?['email']}');
 
         return {'success': true, 'user': _currentUser, 'tokens': responseData};
       } else {
@@ -368,11 +334,9 @@ class DjangoAuthService {
           errorMessage = errorData['error'];
         }
 
-        print('❌ Google sign in error: $errorMessage');
         return {'success': false, 'error': errorMessage};
       }
     } catch (e) {
-      print('❌ Google sign in error: $e');
       return {
         'success': false,
         'error':
@@ -383,11 +347,9 @@ class DjangoAuthService {
 
   // Send Password Reset OTP
   Future<Map<String, dynamic>> sendPasswordResetOTP(String email) async {
-    print("📱 Sending OTP to: $email");
 
     try {
       final url = '${_baseUrl}send-otp/';
-      print("🌐 Calling: $url");
 
       final response = await http
           .post(
@@ -397,13 +359,10 @@ class DjangoAuthService {
           )
           .timeout(const Duration(seconds: 20));
 
-      print("📡 Response status: ${response.statusCode}");
-
       final responseData = json.decode(response.body);
 
       if (response.statusCode == 200) {
         if (responseData['success'] == true) {
-          print("✅ OTP sent successfully!");
           return {
             'success': true,
             'message': responseData['message'] ?? 'OTP sent successfully!',
@@ -423,15 +382,12 @@ class DjangoAuthService {
         };
       }
     } on TimeoutException {
-      print(
-          "⏱️ Request timeout - backend might be slow or email sending delayed");
       return {
         'success': false,
         'message':
             'Connection timeout. The server is taking too long to respond. Please try again.',
       };
     } catch (e) {
-      print("❌ Network error: $e");
       return {
         'success': false,
         'message': 'Backend connection failed: ${e.toString()}',
@@ -514,7 +470,6 @@ class DjangoAuthService {
   // Sign out
   Future<void> signOut() async {
     try {
-      print('🔄 Signing out from Django');
 
       // Capture refresh token before clearing
       final String? tokenToBlacklist = _refreshToken;
@@ -537,20 +492,17 @@ class DjangoAuthService {
       try {
         await _clearCookies();
       } catch (e) {
-        print('⚠️ Cookie clearing failed: $e');
       }
 
       // Sign out from Google
       try {
         await _googleSignIn.signOut();
       } catch (e) {
-        print('⚠️ Google sign out failed: $e');
       }
 
       // 2. INFORMLY CALL BACKEND (Don't block UI if this is slow)
       if (tokenToBlacklist != null) {
         final url = '${_baseUrl}logout/';
-        print('📡 Sending blacklist request to: $url');
 
         try {
           await http
@@ -564,7 +516,6 @@ class DjangoAuthService {
               )
               .timeout(const Duration(seconds: 3));
         } catch (e) {
-          print('ℹ️ Backend logout call result: User logged out locally ($e)');
         }
       }
 
@@ -599,8 +550,6 @@ class DjangoAuthService {
             ? valueAndAttributes
             : valueAndAttributes.substring(0, semiIndex);
 
-        print('🍪 Injecting Cookie: $key for domain: $domain');
-
         await _cookieManager.setCookie(
           url: WebUri(_baseUrl),
           name: key,
@@ -612,7 +561,6 @@ class DjangoAuthService {
         );
       }
     } catch (e) {
-      print('❌ Error injecting cookies: $e');
     }
   }
 
@@ -620,9 +568,7 @@ class DjangoAuthService {
   Future<void> _clearCookies() async {
     try {
       await _cookieManager.deleteCookies(url: WebUri(_baseUrl));
-      print('🍪 Cookies cleared');
     } catch (e) {
-      print('❌ Error clearing cookies: $e');
     }
   }
 
