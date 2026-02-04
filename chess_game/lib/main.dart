@@ -214,8 +214,8 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
       // Stop audio immediately as this is a termination event
       final roomId = payload != null ? payload['room_id'] : null;
       print('🧹 [Main] Termination signal received ($type). Stopping audio and clearing notification...');
-      MqttService().stopAudio(broadcast: true, roomId: roomId);
-      MqttService().cancelCallNotification(roomId: roomId);
+      MqttService().stopAudio(broadcast: false, roomId: roomId);
+      MqttService().cancelCallNotification(roomId: roomId, broadcast: false);
     } else if (type == 'call_invitation') {
       if (action == 'accept') {
         // Cleanup in background without awaiting

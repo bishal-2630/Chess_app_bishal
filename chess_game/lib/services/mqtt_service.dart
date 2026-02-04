@@ -552,7 +552,7 @@ class MqttService {
     }
   }
 
-  Future<void> cancelCallNotification({String? roomId}) async {
+  Future<void> cancelCallNotification({String? roomId, bool broadcast = true}) async {
     // Standardize IDs: game=888, call=999
     try {
       await flutterLocalNotificationsPlugin.cancel(888).catchError((_) {});
@@ -561,13 +561,15 @@ class MqttService {
       print('Notification cancellation error: $e');
     }
     
-    // Broadcast cancellation to other isolates
-    for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
-      final sendPort = IsolateNameServer.lookupPortByName(portName);
-      if (sendPort != null) {
-        sendPort.send({'action': 'cancel_notification', 'id': 999});
-        sendPort.send({'action': 'cancel_notification', 'id': 888});
-        sendPort.send({'action': 'dismiss_call'});
+    if (broadcast) {
+      // Broadcast cancellation to other isolates
+      for (final portName in ['chess_game_main_port', 'chess_game_bg_port']) {
+        final sendPort = IsolateNameServer.lookupPortByName(portName);
+        if (sendPort != null) {
+          sendPort.send({'action': 'cancel_notification', 'id': 999});
+          sendPort.send({'action': 'cancel_notification', 'id': 888});
+          sendPort.send({'action': 'dismiss_call'});
+        }
       }
     }
     
@@ -586,7 +588,7 @@ class MqttService {
       _currentCallRoomId = null;
     }
     
-    stopAudio(broadcast: true, roomId: roomIdToStop);
+    stopAudio(broadcast: broadcast, roomId: roomIdToStop);
   }
   
   void setInCall(bool inCall) {
