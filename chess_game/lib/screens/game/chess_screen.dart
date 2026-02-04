@@ -2198,7 +2198,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
                   ],
                 ),
               ],
-            ),
+            ),,
             
             // In-game call notification banner
             if (_showIncomingCallBanner)
