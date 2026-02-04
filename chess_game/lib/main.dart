@@ -66,7 +66,8 @@ class MyApp extends StatelessWidget {
               builder: (context, state) {
                 final roomId = state.uri.queryParameters['roomId'];
                 final color = state.uri.queryParameters['color'];
-                return ChessScreen(roomId: roomId, color: color);
+                final opponentName = state.uri.queryParameters['opponentName'];
+                return ChessScreen(roomId: roomId, color: color, opponentName: opponentName);
               },
             ),
             GoRoute(
@@ -237,9 +238,11 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
     } else if (type == 'game_invitation') {
       if (action == 'accept') {
         final roomId = payload['room_id'];
+        // Opponent is the sender of the invitation
+        final sender = payload['sender']['username'] ?? 'Unknown';
         
         // Navigate immediately
-        context.go('/chess?roomId=$roomId&color=b');
+        context.go('/chess?roomId=$roomId&color=b&opponentName=$sender');
 
         // Cleanup in background
         MqttService().stopAudio(broadcast: true);
@@ -277,7 +280,8 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
       // Auto-navigation disabled per user request. User joins via notification tap.
     } else if (action == 'join_confirmed') {
       print('🚀 [Main] Join confirmed! Navigating to game room: $roomId');
-      context.go('/chess?roomId=$roomId&color=w');
+      // Receiver is the opponent as I am the challenger
+      context.go('/chess?roomId=$roomId&color=w&opponentName=$receiver');
     } else if (action == 'decline') {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
