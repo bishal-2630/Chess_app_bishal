@@ -1902,8 +1902,8 @@ class _ChessGameScreenState extends State<ChessScreen> {
             ),
           ),
 
-          // Top captured pieces (Black's captures - pieces captured by Black)
-          _buildCapturedDisplay(whiteCapturedPieces),
+          // Top captured pieces (Opponent's captures)
+          _buildCapturedDisplay(_playerColor == 'b' ? blackCapturedPieces : whiteCapturedPieces),
 
           // Chess Board
           Expanded(
@@ -1948,8 +1948,8 @@ class _ChessGameScreenState extends State<ChessScreen> {
             ),
           ),
 
-          // Bottom captured pieces (White's captures - pieces captured by White)
-          _buildCapturedDisplay(blackCapturedPieces),
+          // Bottom captured pieces (Current player's captures)
+          _buildCapturedDisplay(_playerColor == 'b' ? whiteCapturedPieces : blackCapturedPieces),
 
           // Call Status Footer (Only show when message is active)
           if (_callStatus.isNotEmpty)
@@ -2030,21 +2030,24 @@ class _ChessGameScreenState extends State<ChessScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Stack(
                         clipBehavior: Clip.none,
                         children: [
-                          ElevatedButton.icon(
-                            onPressed: () async {
-                              await context.push('/invitations');
-                              _loadInviteCount(); // Refresh when coming back
-                            },
-                            icon: const Icon(Icons.mail),
-                            label: const Text('Invites'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.teal,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                await context.push('/invitations');
+                                _loadInviteCount(); // Refresh when coming back
+                              },
+                              icon: const Icon(Icons.mail),
+                              label: const Text('Invites'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.teal,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
                             ),
                           ),
                           if (_inviteCount > 0)

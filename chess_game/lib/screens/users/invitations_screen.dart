@@ -204,83 +204,223 @@ class InvitationCard extends StatelessWidget {
     final createdAt = DateTime.parse(invitation['created_at']);
     final timeAgo = _getTimeAgo(createdAt);
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 15,
+            spreadRadius: 2,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                // Sender profile picture
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: Colors.blue[100],
-                  backgroundImage: sender['profile_picture'] != null
-                      ? NetworkImage(sender['profile_picture'])
-                      : null,
-                  child: sender['profile_picture'] == null
-                      ? Icon(
-                          Icons.person,
-                          size: 20,
-                          color: Colors.blue[800],
-                        )
-                      : null,
+            // Top Accent Bar
+            Container(
+              height: 4,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.blue[400]!, Colors.blue[800]!],
                 ),
-                
-                const SizedBox(width: 12),
-                
-                // Invitation info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Text(
-                        '${sender['username']} challenged you!',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                      // Sender profile picture with modern border
+                      Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.blue[100]!, width: 2),
+                        ),
+                        child: CircleAvatar(
+                          radius: 28,
+                          backgroundColor: Colors.blue[50],
+                          backgroundImage: sender['profile_picture'] != null
+                              ? NetworkImage(sender['profile_picture'])
+                              : null,
+                          child: sender['profile_picture'] == null
+                              ? Icon(
+                                  Icons.person_rounded,
+                                  size: 32,
+                                  color: Colors.blue[400],
+                                )
+                              : null,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Room: ${invitation['room_id']} • $timeAgo',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
+                      
+                      const SizedBox(width: 16),
+                      
+                      // Invitation info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              sender['username'],
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF1A1A1A),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.blue[50],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'CHALLENGED YOU',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.2,
+                                  color: Colors.blue[800],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      // Time badge
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Icon(Icons.access_time_rounded, size: 14, color: Colors.grey),
+                          const SizedBox(height: 4),
+                          Text(
+                            timeAgo,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 20),
+                  
+                  // Room details
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF9F9F9),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.meeting_room_rounded, size: 18, color: Colors.grey[600]),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Room: ${invitation['room_id']}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[700],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          'Invite Expires in 5m',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[400],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 20),
+                  
+                  // Action buttons with modern style
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: onDecline,
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.grey[600],
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'DECLINE',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.green.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ElevatedButton(
+                            onPressed: onAccept,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green[600],
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.play_arrow_rounded),
+                                SizedBox(width: 8),
+                                Text(
+                                  'ACCEPT',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Action buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                OutlinedButton(
-                  onPressed: onDecline,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red),
-                  ),
-                  child: const Text('Decline'),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton(
-                  onPressed: onAccept,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Accept'),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
