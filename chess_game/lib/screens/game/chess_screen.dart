@@ -88,6 +88,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
 
   // In-game call notification state
   bool _showIncomingCallBanner = false;
+  bool _isCalling = false; // New state for outgoing call
   String _incomingCallFrom = '';
   String _incomingCallRoomId = '';
   StreamSubscription? _callNotificationSubscription;
@@ -140,6 +141,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
         // Hide banner and stop ringtone
         setState(() {
           _showIncomingCallBanner = false;
+          _isCalling = false; // Stop outgoing call banner too
         });
         MqttService().stopAudio();
       }
@@ -185,7 +187,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
 
     _signalingService.onAddRemoteStream = ((stream) {
       _remoteRenderer.srcObject = stream;
-      _setEphemeralStatus("Voice Connected");
+      // _setEphemeralStatus("Voice Connected"); // Handled by banner
     });
 
     _signalingService.onGameMove = (data) {
@@ -233,15 +235,15 @@ class _ChessGameScreenState extends State<ChessScreen> {
       setState(() {
         _isIncomingCall = true;
       });
-      _setEphemeralStatus("Incoming Call...");
-      // Dialog removed - using CallNotificationBanner instead
+      // Banner handles UI
     };
 
     _signalingService.onCallAccepted = () {
       setState(() {
         _isAudioOn = true;
+        _isCalling = false; // Stop calling banner
       });
-      _setEphemeralStatus("Call Accepted");
+      // Banner handles "Voice Connected" UI
       // Stop calling ringtone
       MqttService().stopAudio();
     };
@@ -249,21 +251,23 @@ class _ChessGameScreenState extends State<ChessScreen> {
     _signalingService.onCallRejected = () {
       setState(() {
         _callStatus = "";
+        _isCalling = false; // Stop calling banner
       });
-      _setEphemeralStatus("Call Rejected by Opponent");
+      _setEphemeralStatus("Call Declined");
       // Stop calling ringtone
       MqttService().stopAudio();
     };
 
     _signalingService.onEndCall = () async {
       await MqttService().stopAudio(); // Stop any ringing
-      if (_isAudioOn || _callStatus == "Calling...") {
+      if (_isAudioOn || _callStatus == "Calling..." || _isCalling) {
         await _signalingService.stopAudio();
         setState(() {
           _isAudioOn = false;
           _isIncomingCall = false;
+          _isCalling = false;
         });
-        _setEphemeralStatus("Call Ended");
+        // _setEphemeralStatus("Call Ended"); // Optional
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text("Call ended."), duration: Duration(seconds: 2)));
       }
@@ -462,6 +466,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
       setState(() {
         _isAudioOn = false;
         _isIncomingCall = false;
+        _isCalling = false;
       });
     } else {
       // Start or Accept Call
@@ -472,11 +477,16 @@ class _ChessGameScreenState extends State<ChessScreen> {
           setState(() {
             _isAudioOn = true;
             _isIncomingCall = false;
+            _isCalling = false;
           });
-          _setEphemeralStatus("Call Connected");
+          // _setEphemeralStatus("Call Connected"); // Handled by banner
         } else {
           // Start Call (Initiator part)
-          _setEphemeralStatus("Calling...");
+          setState(() {
+             _isCalling = true;
+          });
+          // _setEphemeralStatus("Calling..."); // Handled by banner
+          
           // Play calling ringtone IMMEDIATELY before signaling setup
           MqttService().playSound('sounds/call_ringtone.mp3');
 
@@ -485,6 +495,9 @@ class _ChessGameScreenState extends State<ChessScreen> {
       } catch (e) {
         print("❌ Error starting audio call: $e");
         MqttService().stopAudio(); // Stop ringtone on error
+        setState(() {
+           _isCalling = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text("Could not start audio call: $e"),
           backgroundColor: Colors.red,
@@ -2222,6 +2235,65 @@ class _ChessGameScreenState extends State<ChessScreen> {
           ),
 
           // In-game call notification banner
+          // Outgoing Call Banner
+          if (_isCalling && !_isAudioOn)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                child: Material(
+                  color: Colors.transparent,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[800], // Distinct color for calling
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(12),
+                        bottomRight: Radius.circular(12),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          "Calling...",
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                         const SizedBox(width: 16),
+                        GestureDetector(
+                          onTap: () async {
+                             // User cancels call
+                             await _toggleAudio();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.call_end,
+                                color: Colors.white, size: 20),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
           // Active Call Banner
           if (_isAudioOn && !_showIncomingCallBanner)
             Positioned(
