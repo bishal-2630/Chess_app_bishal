@@ -136,6 +136,12 @@ class _CallScreenState extends State<CallScreen> {
           _inCall = true;
           _status = "Connected";
         });
+        
+        // Show ongoing call notification
+        await MqttService().showOngoingCallNotification(
+          otherUserName: widget.otherUserName,
+          roomId: widget.roomId,
+        );
       }
     };
 
@@ -145,6 +151,12 @@ class _CallScreenState extends State<CallScreen> {
         _inCall = true;
         _status = "Connected";
       });
+      
+      // Show ongoing call notification
+      await MqttService().showOngoingCallNotification(
+        otherUserName: widget.otherUserName,
+        roomId: widget.roomId,
+      );
     };
 
     _signalingService.onEndCall = () async {
@@ -202,6 +214,7 @@ class _CallScreenState extends State<CallScreen> {
     // Ensure audio is stopped and in-call state cleared
     MqttService().stopAudio(broadcast: true);
     MqttService().setInCall(false);
+    MqttService().cancelOngoingCallNotification();
     
     if (mounted) {
       setState(() {
@@ -224,6 +237,7 @@ class _CallScreenState extends State<CallScreen> {
     print("📞 CallScreen: dispose called");
     _callTimeoutTimer?.cancel();
     MqttService().setInCall(false);
+    MqttService().cancelOngoingCallNotification();
     _localRenderer.dispose();
     _remoteRenderer.dispose();
     _signalingService.hangUp();

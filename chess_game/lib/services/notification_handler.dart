@@ -39,6 +39,23 @@ void notificationTapBackground(NotificationResponse response) async {
         sendPort.send({'action': 'stop_audio', 'roomId': roomId});
         sendPort.send({'action': 'dismiss_call'});
 
+        // Handle ongoing call actions
+        if (actionId == 'return_to_call' && type == 'ongoing_call') {
+          print('📞 [BG-FATAL] Return to Call action');
+          // Navigation will be handled by main app
+          sendPort.send({
+            'action': 'navigate_to_call',
+            'roomId': roomId,
+            'otherUser': payload?['other_user'],
+          });
+        } else if (actionId == 'end_call' && type == 'ongoing_call') {
+          print('❌ [BG-FATAL] End Call action');
+          sendPort.send({
+            'action': 'end_active_call',
+            'roomId': roomId,
+          });
+        }
+
         // If Decline, delegate the network request
         if (actionId == 'decline_action' || actionId == 'decline') {
           if ((type == 'call_invitation' || type == 'incoming_call') && payload != null) {

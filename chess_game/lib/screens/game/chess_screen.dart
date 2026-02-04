@@ -124,11 +124,10 @@ class _ChessGameScreenState extends State<ChessScreen> {
             _incomingCallRoomId = roomId ?? '';
           });
           
-          // Play ringtone
-          MqttService().playSound('sounds/ringtone.mp3', roomId: roomId);
+          // Ringtone is already playing from MqttService
         }
         // If user is not in a room, system notification will handle it
-        // (MqttService already shows notification via MQTT message handler)
+        // (MqttService already shows notification and plays ringtone)
       } else if (type == 'call_ended' || type == 'call_declined' || type == 'call_cancelled') {
         // Hide banner and stop ringtone
         setState(() {
@@ -227,7 +226,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
         _isIncomingCall = true;
       });
       _setEphemeralStatus("Incoming Call...");
-      _showIncomingCallDialog();
+      // Dialog removed - using CallNotificationBanner instead
     };
 
     _signalingService.onCallAccepted = () {
