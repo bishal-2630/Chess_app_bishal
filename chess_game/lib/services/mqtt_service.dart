@@ -260,10 +260,10 @@ class MqttService {
         if (type == 'invitation_response') {
           final action = payloadMap?['action'] ?? data['action'];
           if (action == 'accept' || response.actionId == 'join_action') {
-            print('✅ [FG] ACTION: JOIN CHALLENGE');
+            print('✅ [FG] ACTION: JOIN CHALLENGE (CONFIRMED)');
             _emitNotification({
               ...data,
-              'action': 'accept',
+              'action': 'join_confirmed',
             });
             return;
           }

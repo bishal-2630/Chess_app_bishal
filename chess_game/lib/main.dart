@@ -270,12 +270,14 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
     if (action == 'accept') {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$receiver accepted your challenge! Joining game...'),
+          content: Text('$receiver accepted your challenge! Tap the notification to join.'),
           backgroundColor: Colors.green,
         ),
       );
-      // Removed automatic navigation. User will join via the notification "Join" button.
-      // context.go('/chess?roomId=$roomId&color=w');
+      // Auto-navigation disabled per user request. User joins via notification tap.
+    } else if (action == 'join_confirmed') {
+      print('🚀 [Main] Join confirmed! Navigating to game room: $roomId');
+      context.go('/chess?roomId=$roomId&color=w');
     } else if (action == 'decline') {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

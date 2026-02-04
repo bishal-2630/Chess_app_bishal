@@ -186,6 +186,8 @@ class _ChessGameScreenState extends State<ChessScreen> {
         _isAudioOn = true;
       });
       _setEphemeralStatus("Call Accepted");
+      // Stop calling ringtone
+      MqttService().stopAudio();
     };
 
     _signalingService.onCallRejected = () {
@@ -193,9 +195,12 @@ class _ChessGameScreenState extends State<ChessScreen> {
         _callStatus = "";
       });
       _setEphemeralStatus("Call Rejected by Opponent");
+      // Stop calling ringtone
+      MqttService().stopAudio();
     };
 
     _signalingService.onEndCall = () async {
+      await MqttService().stopAudio(); // Stop any ringing
       if (_isAudioOn || _callStatus == "Calling...") {
         await _signalingService.stopAudio();
         setState(() {
@@ -361,6 +366,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
       // End Call
       _signalingService.sendEndCall();
       await _signalingService.stopAudio();
+      await MqttService().stopAudio(); // Stop calling ringtone if any
       setState(() {
         _isAudioOn = false;
         _isIncomingCall = false;
@@ -380,9 +386,12 @@ class _ChessGameScreenState extends State<ChessScreen> {
           // Start Call (Initiator part)
           await _signalingService.startCall(_localRenderer, _remoteRenderer);
           _setEphemeralStatus("Calling...");
+          // Play calling ringtone
+          MqttService().playSound('sounds/call_ringtone.mp3');
         }
       } catch (e) {
         print("❌ Error starting audio call: $e");
+        MqttService().stopAudio(); // Stop ringtone on error
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text("Could not start audio call: $e"),
           backgroundColor: Colors.red,
