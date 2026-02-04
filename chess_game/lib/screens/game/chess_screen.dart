@@ -108,15 +108,20 @@ class _ChessGameScreenState extends State<ChessScreen> {
       if (!mounted) return;
       
       final type = data['type'];
+      print('♟️ ChessScreen MQTT: Received type=$type'); // DEBUG LOG
+
       if (type == 'call_invitation' || type == 'incoming_call') {
         final payload = data['data'] ?? data['payload'];
         final caller = payload['caller'] ?? payload['sender'];
         final roomId = payload['room_id'];
         
+        print('♟️ ChessScreen MQTT: Call Inv - RoomId: $roomId, MyRoom: ${widget.roomId}, Connected: $_isConnectedToRoom'); // DEBUG LOG
+        
         // If user is in a chess room, show banner and cancel system notification
         if (_isConnectedToRoom) {
           // Cancel system notification in favor of in-app banner
-          MqttService().cancelCallNotification(roomId: roomId, broadcast: false);
+          // Use dismissCallNotification to avoid stopping audio or ignoring room
+          MqttService().dismissCallNotification();
           
           setState(() {
             _showIncomingCallBanner = true;
@@ -1920,44 +1925,13 @@ class _ChessGameScreenState extends State<ChessScreen> {
           ]
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          // In-game call notification banner
-          if (_showIncomingCallBanner)
-            CallNotificationBanner(
-              callerName: _incomingCallFrom,
-              onAnswer: () async {
-                // Stop ringtone
-                await MqttService().stopAudio();
-                
-                // Hide banner
-                setState(() {
-                  _showIncomingCallBanner = false;
-                });
-                
-                // Navigate to call screen
-                if (mounted) {
-                  context.push(
-                    '/call?roomId=$_incomingCallRoomId&otherUserName=$_incomingCallFrom&isCaller=false',
-                  );
-                }
-              },
-              onDecline: () async {
-                // Stop ringtone
-                await MqttService().stopAudio();
-                
-                // Hide banner
-                setState(() {
-                  _showIncomingCallBanner = false;
-                });
-                
-                // Send decline signal
-                await GameService.declineCall(
-                  callerUsername: _incomingCallFrom,
-                  roomId: _incomingCallRoomId,
-                );
-              },
-            ),
+          // Main Game Content
+          Column(
+            children: [
+              // User Profile Header
+              // User Profile Header
           // User Profile Header
           GestureDetector(
             onTap: () => context.go('/profile'),

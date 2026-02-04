@@ -631,6 +631,15 @@ class MqttService {
     }
   }
 
+  // Cancels ONLY the system notification without stopping audio or declining
+  Future<void> dismissCallNotification() async {
+    try {
+      await flutterLocalNotificationsPlugin.cancel(999).catchError((_) {});
+    } catch (e) {
+      print('Error dismissing call notification: $e');
+    }
+  }
+
   Future<void> cancelCallNotification({String? roomId, bool broadcast = true}) async {
     // Standardize IDs: game=888, call=999
     try {
