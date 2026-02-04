@@ -11,6 +11,7 @@ import 'dart:math';
 import 'dart:async';
 import 'package:permission_handler/permission_handler.dart';
 import '../../services/mqtt_service.dart';
+import '../../widgets/call_notification_banner.dart';
 
 class ChessScreen extends StatefulWidget {
   final String? roomId;
@@ -85,6 +86,12 @@ class _ChessGameScreenState extends State<ChessScreen> {
   int _inviteCount = 0;
   Timer? _inviteTimer;
 
+  // In-game call notification state
+  bool _showIncomingCallBanner = false;
+  String _incomingCallFrom = '';
+  String _incomingCallRoomId = '';
+  StreamSubscription? _callNotificationSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -95,6 +102,41 @@ class _ChessGameScreenState extends State<ChessScreen> {
     _inviteTimer =
         Timer.periodic(const Duration(seconds: 30), (_) => _loadInviteCount());
     // NotificationService is now connected globally upon login
+
+    // Listen for incoming calls during gameplay
+    _callNotificationSubscription = MqttService().notifications.listen((data) {
+      if (!mounted) return;
+      
+      final type = data['type'];
+      if (type == 'call_invitation' || type == 'incoming_call') {
+        final payload = data['data'] ?? data['payload'];
+        final caller = payload['caller'] ?? payload['sender'];
+        final roomId = payload['room_id'];
+        
+        // If user is in a chess room, show banner and cancel system notification
+        if (_isConnectedToRoom) {
+          // Cancel system notification in favor of in-app banner
+          MqttService().cancelCallNotification(roomId: roomId, broadcast: false);
+          
+          setState(() {
+            _showIncomingCallBanner = true;
+            _incomingCallFrom = caller ?? 'Unknown';
+            _incomingCallRoomId = roomId ?? '';
+          });
+          
+          // Play ringtone
+          MqttService().playSound('sounds/ringtone.mp3', roomId: roomId);
+        }
+        // If user is not in a room, system notification will handle it
+        // (MqttService already shows notification via MQTT message handler)
+      } else if (type == 'call_ended' || type == 'call_declined' || type == 'call_cancelled') {
+        // Hide banner and stop ringtone
+        setState(() {
+          _showIncomingCallBanner = false;
+        });
+        MqttService().stopAudio();
+      }
+    });
 
     // Auto-connect if parameters provided via route
     if (widget.roomId != null) {
@@ -344,6 +386,7 @@ class _ChessGameScreenState extends State<ChessScreen> {
     print("🧹 Disposing ChessScreen state");
     _statusTimer?.cancel();
     _inviteTimer?.cancel();
+    _callNotificationSubscription?.cancel();
     _localRenderer.dispose();
     _remoteRenderer.dispose();
     if (_isConnectedToRoom) {
@@ -1880,6 +1923,42 @@ class _ChessGameScreenState extends State<ChessScreen> {
       ),
       body: Column(
         children: [
+          // In-game call notification banner
+          if (_showIncomingCallBanner)
+            CallNotificationBanner(
+              callerName: _incomingCallFrom,
+              onAnswer: () async {
+                // Stop ringtone
+                await MqttService().stopAudio();
+                
+                // Hide banner
+                setState(() {
+                  _showIncomingCallBanner = false;
+                });
+                
+                // Navigate to call screen
+                if (mounted) {
+                  context.push(
+                    '/call?roomId=$_incomingCallRoomId&otherUserName=$_incomingCallFrom&isCaller=false',
+                  );
+                }
+              },
+              onDecline: () async {
+                // Stop ringtone
+                await MqttService().stopAudio();
+                
+                // Hide banner
+                setState(() {
+                  _showIncomingCallBanner = false;
+                });
+                
+                // Send decline signal
+                await GameService.declineCall(
+                  callerUsername: _incomingCallFrom,
+                  roomId: _incomingCallRoomId,
+                );
+              },
+            ),
           // User Profile Header
           GestureDetector(
             onTap: () => context.go('/profile'),
