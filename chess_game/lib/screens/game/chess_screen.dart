@@ -309,6 +309,9 @@ class _ChessGameScreenState extends State<ChessScreen> {
     _inviteTimer?.cancel();
     _localRenderer.dispose();
     _remoteRenderer.dispose();
+    if (_isConnectedToRoom) {
+      _signalingService.sendBye();
+    }
     _signalingService.hangUp();
     // Notification service lifecycle is now managed by DjangoAuthService
     super.dispose();
@@ -385,10 +388,11 @@ class _ChessGameScreenState extends State<ChessScreen> {
           _setEphemeralStatus("Call Connected");
         } else {
           // Start Call (Initiator part)
-          await _signalingService.startCall(_localRenderer, _remoteRenderer);
           _setEphemeralStatus("Calling...");
-          // Play calling ringtone
+          // Play calling ringtone IMMEDIATELY before signaling setup
           MqttService().playSound('sounds/call_ringtone.mp3');
+          
+          await _signalingService.startCall(_localRenderer, _remoteRenderer);
         }
       } catch (e) {
         print("❌ Error starting audio call: $e");
@@ -539,8 +543,8 @@ class _ChessGameScreenState extends State<ChessScreen> {
       _playerColor = null; // Back to local mode
     });
 
-    // Reset board for a fresh local start if desired, or keep as is.
-    // _initializeBoard();
+    // Reset board for a fresh local start
+    _initializeBoard();
   }
 
   // Convert row/col to algebraic notation

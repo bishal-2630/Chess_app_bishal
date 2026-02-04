@@ -117,9 +117,9 @@ class MqttService {
             category: AVAudioSessionCategory.playback,
           ),
           android: AudioContextAndroid(
-            usageType: AndroidUsageType.notificationRingtone,
+            usageType: AndroidUsageType.voiceCommunication,
             contentType: AndroidContentType.music,
-            audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+            audioFocus: AndroidAudioFocus.gain,
           ),
         );
         AudioLogger.logLevel = AudioLogLevel.none;
@@ -702,10 +702,12 @@ class MqttService {
 
     _isPlaying = true;
     _isAudioLoading = true;
+    print('MQTT [$isolateName]: Attempting to play sound: $fileName');
 
     try {
       // Final Check before starting
       if (_isMutedWindow || _isInCall || (roomId != null && _declinedRoomIds.contains(roomId))) {
+        print('MQTT [$isolateName]: Play blocked. Muted: $_isMutedWindow, InCall: $_isInCall, Declined: ${roomId != null && _declinedRoomIds.contains(roomId)}');
         _isPlaying = false;
         _isAudioLoading = false;
         return;
