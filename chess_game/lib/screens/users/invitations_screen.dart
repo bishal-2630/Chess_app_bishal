@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:async';
 import '../../services/game_service.dart';
+import '../../services/mqtt_service.dart';
 
 class InvitationsScreen extends StatefulWidget {
   const InvitationsScreen({super.key});
@@ -12,11 +13,34 @@ class InvitationsScreen extends StatefulWidget {
 class _InvitationsScreenState extends State<InvitationsScreen> {
   List<dynamic> _invitations = [];
   bool _isLoading = true;
+  Timer? _refreshTimer;
+  StreamSubscription? _mqttSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadInvitations();
+    
+    // Auto-refresh every 30 seconds to handle expiry
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) {
+        setState(() {}); // Trigger rebuild to re-filter expired ones
+      }
+    });
+
+    // Listen for real-time invitation updates
+    _mqttSubscription = MqttService().notifications.listen((data) {
+      if (mounted && (data['type'] == 'game_invitation' || data['type'] == 'invitation_response' || data['type'] == 'invitation_cancelled')) {
+        _loadInvitations();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    _mqttSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadInvitations() async {
@@ -131,9 +155,9 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
               : RefreshIndicator(
                   onRefresh: _loadInvitations,
                   child: ListView.builder(
-                    itemCount: _invitations.length,
+                    itemCount: _getValidInvitations().length,
                     itemBuilder: (context, index) {
-                      final invitation = _invitations[index];
+                      final invitation = _getValidInvitations()[index];
                       return InvitationCard(
                         invitation: invitation,
                         onAccept: () => _respondToInvitation(
@@ -149,6 +173,15 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
                   ),
                 ),
     );
+  }
+
+  List<dynamic> _getValidInvitations() {
+    final now = DateTime.now();
+    return _invitations.where((inv) {
+      final createdAt = DateTime.parse(inv['created_at']);
+      // 5-minute expiry
+      return now.difference(createdAt).inMinutes < 5;
+    }).toList();
   }
 }
 

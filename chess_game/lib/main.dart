@@ -216,6 +216,18 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
       print('🧹 [Main] Termination signal received ($type). Stopping audio and clearing notification...');
       MqttService().stopAudio(broadcast: false, roomId: roomId);
       MqttService().cancelCallNotification(roomId: roomId, broadcast: false);
+    } else if (type == 'invitation_response') {
+      final action = data['action'];
+      if (action == 'decline' && mounted) {
+        final invitation = payload['invitation'];
+        final receiverName = invitation['receiver']['username'];
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$receiverName declined your challenge'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
     } else if (type == 'call_invitation') {
       if (action == 'accept') {
         // Cleanup in background without awaiting

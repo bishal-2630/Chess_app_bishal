@@ -409,6 +409,17 @@ class MqttService {
         } else {
            cancelCallNotification();
         }
+    } else if (type == 'invitation_response') {
+      final invitation = payload['invitation'];
+      final action = data['action'];
+      
+      if (action == 'decline') {
+        _showLocalNotification(
+          'Challenge Declined',
+          '${invitation['receiver']['username']} declined your challenge.',
+          'invitation_declined',
+        );
+      }
     }
     
     _notificationController.add(data);
@@ -540,6 +551,29 @@ class MqttService {
       'You missed a call from $caller',
       notificationDetails,
       payload: 'missed_call',
+    );
+  }
+
+  Future<void> _showLocalNotification(String title, String body, String payload) async {
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'chess_general_alerts',
+      'General Alerts',
+      channelDescription: 'General notifications and alerts',
+      importance: Importance.defaultImportance,
+      priority: Priority.defaultPriority,
+      showWhen: true,
+      autoCancel: true,
+    );
+
+    const NotificationDetails notificationDetails = NotificationDetails(android: androidDetails);
+    final int notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+    await flutterLocalNotificationsPlugin.show(
+      notificationId,
+      title,
+      body,
+      notificationDetails,
+      payload: payload,
     );
   }
 
