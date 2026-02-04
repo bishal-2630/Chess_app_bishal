@@ -2222,6 +2222,66 @@ class _ChessGameScreenState extends State<ChessScreen> {
           ),
 
           // In-game call notification banner
+          // Active Call Banner
+          if (_isAudioOn && !_showIncomingCallBanner)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                child: Material(
+                  color: Colors.transparent,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.green[800],
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(12),
+                        bottomRight: Radius.circular(12),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.mic, color: Colors.white, size: 20),
+                        const SizedBox(width: 8),
+                        const Text(
+                          "Voice Connected",
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 16),
+                        GestureDetector(
+                          onTap: _toggleMute,
+                          child: Icon(
+                            _isMuted ? Icons.mic_off : Icons.mic,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        GestureDetector(
+                          onTap: () async {
+                             await _toggleAudio();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.call_end,
+                                color: Colors.white, size: 20),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // In-game call notification banner
           if (_showIncomingCallBanner)
             Positioned(
               top: 0,
@@ -2232,10 +2292,15 @@ class _ChessGameScreenState extends State<ChessScreen> {
                   callerName: _incomingCallFrom,
                   onAnswer: () async {
                     await MqttService().stopAudio();
-                    setState(() => _showIncomingCallBanner = false);
+                    setState(() {
+                      _showIncomingCallBanner = false;
+                      // Optimistically set likely state to ensure _toggleAudio proceeds
+                      _isIncomingCall = true; 
+                    });
+                    
                     if (mounted) {
-                      context.push(
-                          '/call?roomId=$_incomingCallRoomId&otherUserName=$_incomingCallFrom&isCaller=false');
+                      // Use in-game audio toggle instead of navigating away
+                      await _toggleAudio();
                     }
                   },
                   onDecline: () async {
