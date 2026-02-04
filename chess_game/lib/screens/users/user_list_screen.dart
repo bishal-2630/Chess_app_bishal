@@ -49,9 +49,13 @@ class _UserListScreenState extends State<UserListScreen> {
             _sentChallenges.remove(receiverName);
           });
         } else if (action == 'accept') {
-          // Challenger auto-navigation
-          final roomId = invitation['room_id'];
-          context.go('/chess?roomId=$roomId&color=w');
+          // Challenger UI reset (reset "Sent" button status)
+          final receiverName = invitation['receiver']['username'];
+          setState(() {
+            _sentChallenges.remove(receiverName);
+          });
+          // Removed automatic navigation. User will join via the notification "Join" button.
+          // context.go('/chess?roomId=$roomId&color=w');
         }
       }
     });

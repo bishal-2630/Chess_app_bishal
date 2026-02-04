@@ -274,8 +274,8 @@ class _IncomingCallWrapperState extends State<IncomingCallWrapper> {
           backgroundColor: Colors.green,
         ),
       );
-      // Navigate to the room as White (since we sent the challenge)
-      context.go('/chess?roomId=$roomId&color=w');
+      // Removed automatic navigation. User will join via the notification "Join" button.
+      // context.go('/chess?roomId=$roomId&color=w');
     } else if (action == 'decline') {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
