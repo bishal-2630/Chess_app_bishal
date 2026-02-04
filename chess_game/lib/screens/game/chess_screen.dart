@@ -2199,7 +2199,31 @@ class _ChessGameScreenState extends State<ChessScreen> {
                 ),
               ],
             ),
-          ),
+            
+            // In-game call notification banner
+            if (_showIncomingCallBanner)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: SafeArea(
+                  child: CallNotificationBanner(
+                    callerName: _incomingCallFrom,
+                    onAnswer: () async {
+                      await MqttService().stopAudio();
+                      setState(() => _showIncomingCallBanner = false);
+                      if (mounted) {
+                        context.push('/call?roomId=$_incomingCallRoomId&otherUserName=$_incomingCallFrom&isCaller=false');
+                      }
+                    },
+                    onDecline: () async {
+                      await MqttService().stopAudio();
+                      setState(() => _showIncomingCallBanner = false);
+                      await GameService.declineCall(callerUsername: _incomingCallFrom, roomId: _incomingCallRoomId);
+                    },
+                  ),
+                ),
+              ),
         ],
       ),
     );
