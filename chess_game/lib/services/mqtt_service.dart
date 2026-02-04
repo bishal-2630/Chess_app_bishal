@@ -196,6 +196,7 @@ class MqttService {
 
         // Handle Game Invitation Actions
         if (type == 'game_invitation' || type == 'game_challenge') {
+          if (response.actionId == 'decline_action' || response.actionId == 'decline') {
             await cancelCallNotification();
             print('❌ [FG-FATAL] ACTION: DECLINE GAME');
             final rawId = payloadMap?['id'];
@@ -221,6 +222,7 @@ class MqttService {
         
         // Handle Call Invitation Actions
         if (type == 'call_invitation' || type == 'incoming_call') {
+          if (response.actionId == 'decline_action' || response.actionId == 'decline') {
             await cancelCallNotification();
             print('❌ [FG-FATAL] ACTION: DECLINE CALL');
             if (payloadMap != null) {
