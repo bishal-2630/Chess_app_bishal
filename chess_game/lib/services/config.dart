@@ -11,7 +11,7 @@ class AppConfig {
 
   // Production Railway backend URL
   static const String _productionHost =
-      'chess-game-app-production.up.railway.app';
+      'positive-brianne-self2630-c40dbd11.koyeb.app';
 
   // Local development configuration
   static const String _physicalDeviceHost = '192.168.1.76:8000';
