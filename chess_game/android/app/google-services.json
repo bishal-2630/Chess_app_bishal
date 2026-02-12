@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:764791811000:android:ffcb39e26fa069746d3d4d",
         "android_client_info": {
-          "package_name": "com.example.chess"
+          "package_name": "com.example.chess_bishal"
         }
       },
       "oauth_client": [
@@ -17,7 +17,7 @@
           "client_id": "764791811000-teuk8qauavvsi2a16dkr9il735t9ljr6.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.example.chess",
+            "package_name": "com.example.chess_bishal",
             "certificate_hash": "055bfd91adf1f77154103c1d21a80312491dc3b0"
           }
         }

@@ -1,4 +1,4 @@
-name: Chess
+name: chess_bishal
 description: A chess game with Django authentication
 publish_to: "none"
 version: 1.0.0+1
