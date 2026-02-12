@@ -1,1 +1,29 @@
-{"web":{"client_id":"31377906369-hcr20b12luf4t7ipe4ga6lf23egb7ags.apps.googleusercontent.com","project_id":"nepal-stock-485509","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","client_secret":"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","redirect_uris":["https://positive-brianne-self2630-c40dbd11.koyeb.app/api/auth/google-login/"],"javascript_origins":["https://positive-brianne-self2630-c40dbd11.koyeb.app"]}}
+{
+  "project_info": {
+    "project_number": "1059251569808",
+    "project_id": "chessbishal-64578",
+    "storage_bucket": "chessbishal-64578.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1059251569808:android:6c4295be11358fe5948415",
+        "android_client_info": {
+          "package_name": "com.example.chess_bishal"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCFowQVewtvFuqrtm7tG7XTdsPgRJNJAqU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -25,7 +25,7 @@ class DjangoAuthService {
   GoogleSignIn? __googleSignIn;
   GoogleSignIn get _googleSignIn => __googleSignIn ??= GoogleSignIn(
     serverClientId:
-        '31377906369-hcr20b12luf4t7ipe4ga6lf23egb7ags.apps.googleusercontent.com',
+        '1059251569808-94aeup33dh3tdrr844dlkqnoppqbv49p.apps.googleusercontent.com',
   );
 
   // User data storage
