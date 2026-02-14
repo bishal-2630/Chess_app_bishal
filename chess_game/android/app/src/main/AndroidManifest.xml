@@ -43,6 +43,27 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            
+            <!-- Deep Link: Custom Scheme (chess://) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="chess"/>
+                <data android:host="play"/>
+                <data android:host="game"/>
+            </intent-filter>
+            
+            <!-- Deep Link: HTTPS URLs (App Links) -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https"/>
+                <data android:host="positive-brianne-self2630-c40dbd11.koyeb.app"/>
+                <data android:pathPrefix="/play"/>
+                <data android:pathPrefix="/game"/>
+            </intent-filter>
         </activity>
         <service
             android:name="id.flutter.flutter_background_service.BackgroundService"

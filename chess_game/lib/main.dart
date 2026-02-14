@@ -8,10 +8,12 @@ import 'screens/profile/profile_screen.dart';
 import 'screens/call_screen.dart';
 import 'screens/users/user_list_screen.dart';
 import 'screens/users/invitations_screen.dart';
+import 'screens/chess_webview_screen.dart';
 import 'services/django_auth_service.dart';
 import 'services/mqtt_service.dart';
 import 'services/game_service.dart';
 import 'services/background_service.dart';
+import 'services/deep_link_handler.dart';
 import 'dart:async';
 import 'dart:isolate';
 import 'dart:ui';
@@ -33,6 +35,9 @@ void main() async {
 
   runApp(const MyApp());
 }
+
+// Global router for deep link navigation
+late final GoRouter _globalRouter;
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -100,6 +105,13 @@ class MyApp extends StatelessWidget {
               path: '/invitations',
               builder: (context, state) => const InvitationsScreen(),
             ),
+            GoRoute(
+              path: '/web-chess',
+              builder: (context, state) {
+                final gameId = state.uri.queryParameters['gameId'];
+                return ChessWebViewScreen(gameId: gameId);
+              },
+            ),
           ],
         ),
       ],
@@ -124,6 +136,12 @@ class MyApp extends StatelessWidget {
       },
     );
 
+    // Store router globally for deep link navigation
+    _globalRouter = router;
+
+    // Initialize deep link handler
+    _initializeDeepLinks();
+
     return MaterialApp.router(
       title: 'Chess Game',
       routerConfig: router,
@@ -133,6 +151,39 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
     );
+  }
+
+  void _initializeDeepLinks() {
+    final deepLinkHandler = DeepLinkHandler();
+    
+    deepLinkHandler.initialize((Uri uri) {
+      print('📎 Processing deep link: $uri');
+      
+      // Parse the deep link
+      final linkData = deepLinkHandler.parseDeepLink(uri);
+      print('📎 Parsed link data: $linkData');
+      
+      // Route based on link type
+      switch (linkData.type) {
+        case DeepLinkType.play:
+          _globalRouter.go('/web-chess');
+          break;
+        case DeepLinkType.game:
+          if (linkData.gameId != null) {
+            _globalRouter.go('/web-chess?gameId=${linkData.gameId}');
+          } else {
+            _globalRouter.go('/web-chess');
+          }
+          break;
+        case DeepLinkType.profile:
+          _globalRouter.go('/profile');
+          break;
+        case DeepLinkType.home:
+        default:
+          _globalRouter.go('/chess');
+          break;
+      }
+    });
   }
 }
 
