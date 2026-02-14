@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // Added for kIsWeb
 import 'package:go_router/go_router.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
@@ -28,10 +29,15 @@ void main() async {
   // Initialize MQTT Service (sets up local notifications)
   final mqttService = MqttService();
   await mqttService.initialize();
-  mqttService.initializeIsolateListener(isBackground: false);
+  // Isolate listener is mobile-only
+  if (!kIsWeb) {
+    mqttService.initializeIsolateListener(isBackground: false);
+  }
 
-  // Initialize Background Service for persistent connection
-  await BackgroundServiceInstance.initializeService();
+  // Initialize Background Service for persistent connection (Mobile only)
+  if (!kIsWeb) {
+    await BackgroundServiceInstance.initializeService();
+  }
 
   runApp(const MyApp());
 }
@@ -110,6 +116,17 @@ class MyApp extends StatelessWidget {
               builder: (context, state) {
                 final gameId = state.uri.queryParameters['gameId'];
                 return ChessWebViewScreen(gameId: gameId);
+              },
+            ),
+            GoRoute(
+              path: '/play',
+              redirect: (context, state) => '/web-chess',
+            ),
+            GoRoute(
+              path: '/game/:gameId',
+              redirect: (context, state) {
+                final gameId = state.pathParameters['gameId'];
+                return '/web-chess?gameId=$gameId';
               },
             ),
           ],
