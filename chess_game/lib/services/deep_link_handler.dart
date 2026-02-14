@@ -15,7 +15,7 @@ class DeepLinkHandler {
   Future<void> initialize(Function(Uri) onLinkReceived) async {
     // Handle initial link if app was opened via deep link
     try {
-      final initialUri = await _appLinks.getInitialLink();
+      final initialUri = await _appLinks.getInitialAppLink();
       if (initialUri != null) {
         print('📎 Initial deep link: $initialUri');
         onLinkReceived(initialUri);
